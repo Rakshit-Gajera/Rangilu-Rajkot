@@ -25,7 +25,7 @@ Game (TypeScript, `game/`)
 - [x] 1.10 Scooter: ray-cast vehicle, lean, enter/exit, horn
 - [x] 1.11 HUD: minimap, clock, speed, area name
 - [x] 1.12 Playwright: boot + viewpoint screenshots + perf numbers
-- [ ] 1.13 Reviewer pass → fixes → gate
+- [x] 1.13 Reviewer pass → fixes (gate: waiting for Rakshit)
 
 ## Done
 P0 — data recon (see PROGRESS.md and DATA_REPORT.md).
