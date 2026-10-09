@@ -6,7 +6,7 @@ import { Audio } from './app/audio';
 import { Input } from './app/input';
 import { Physics } from './physics/physics';
 import { worldUniforms } from './render/materials';
-import { Clock, Environment } from './render/sky';
+import { Clock, Environment, goldenHour } from './render/sky';
 import { Hud } from './ui/hud';
 import { World } from './world/world';
 
@@ -30,10 +30,10 @@ async function main() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.setSize(innerWidth, innerHeight);
-  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const shadowSize = params.get('shadows') === '0' ? 0 : 2048;
   renderer.shadowMap.enabled = shadowSize > 0;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.2, 6000);
@@ -54,12 +54,14 @@ async function main() {
   // The rest of the slice streams in the background.
   void world.ensure(spawn.x, spawn.z, 3000);
 
-  const gy = physics.groundAt(spawn.x, spawn.z) ?? 30;
+  // Rapier scene queries only see new colliders after a step, so spawn heights come from the tile grid.
+  const gy = world.terrainAt(spawn.x, spawn.z) ?? 30;
   const player = new Player(physics, scene, spawn.x, gy, spawn.z);
   const sx = spawn.x + 2.2, sz = spawn.z + 1.0;
-  const scooter = new Scooter(physics, scene, sx, physics.groundAt(sx, sz) ?? gy, sz, spawn.heading + Math.PI / 2);
+  const scooter = new Scooter(physics, scene, sx, world.terrainAt(sx, sz) ?? gy, sz, spawn.heading + Math.PI / 2);
   const env = new Environment(scene, renderer, shadowSize);
-  const clock = new Clock(Number(params.get('hour') ?? 18.5));
+  // Spawn in the golden hour: 40 minutes before today's real sunset in Rajkot (PROMPT §3.1).
+  const clock = new Clock(params.has('hour') ? Number(params.get('hour')) : goldenHour());
   const input = new Input(canvas);
   const follow = new FollowCamera(camera, physics);
   const audio = new Audio();
@@ -128,7 +130,7 @@ async function main() {
     } else {
       follow.update(input, focus, dt, riding ? { minDist: 4.5, fovBoost: Math.min(Math.abs(scooter.speed) * 0.5, 12) } : {});
     }
-    env.update(clock, fixedView ? fixedView.look : focus);
+    env.update(clock, fixedView ? fixedView.look : focus, camera);
     world.flushUploads(4);
     renderer.render(scene, camera);
 
@@ -168,7 +170,9 @@ async function main() {
     freeView: () => { fixedView = null; },
     ensure: (x: number, z: number, r: number) => world.ensure(x, z, r),
     ground: (x: number, z: number) => physics.groundAt(x, z),
+    terrain: (x: number, z: number) => world.terrainAt(x, z),
     player: () => player.position.toArray(),
+    teleportPlayer: (x: number, y: number, z: number) => player.teleport(x, y, z),
     scooter: () => ({ pos: scooter.position.toArray(), speed: scooter.speed, riding }),
   };
   requestAnimationFrame(frame);

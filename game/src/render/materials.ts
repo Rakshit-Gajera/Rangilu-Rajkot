@@ -48,17 +48,18 @@ export function facadeMaterial(): THREE.MeshStandardMaterial {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 attribute vec4 facade; attribute vec4 meta; attribute vec2 fuv;
-varying vec4 vFacade; varying vec4 vMeta; varying vec2 vFuv;`)
+flat varying vec4 vFacade; flat varying vec4 vMeta; varying vec2 vFuv;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vFacade = facade; vMeta = meta; vFuv = fuv;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uNight; uniform float uHour; uniform vec3 uPal[28];
-varying vec4 vFacade; varying vec4 vMeta; varying vec2 vFuv;
+flat varying vec4 vFacade; flat varying vec4 vMeta; varying vec2 vFuv;
 ${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   float zone = vFacade.x; float kind = vFacade.z; float groundH = vFacade.w;
-  float seed = vMeta.x; float roofH = vMeta.z; float shop = vMeta.w;
+  // Quantised seed: hashes must not see interpolation noise.
+  float seed = floor(vMeta.x * 4096.0) / 64.0; float roofH = vMeta.z; float shop = vMeta.w;
   int zi = int(zone + 0.5) - 1; int pi = int(mod(vFacade.y, 4.0) + 0.5);
   vec3 plaster = uPal[clamp(zi, 0, 6) * 4 + pi];
   plaster *= 0.92 + 0.16 * fHash(vec2(seed * 97.0, 3.1));
@@ -70,6 +71,10 @@ ${GLSL_COMMON}`)
   vec3 col = plaster;
   vec3 emis = vec3(0.0);
   float rough = 0.92;
+  // Anti-aliasing: fade procedural detail by the pixel footprint on the wall (metres per pixel).
+  float fw = max(fwidth(vFuv.x), fwidth(vFuv.y));
+  float detail = 1.0 - smoothstep(0.03, 0.15, fw);  // bars, grilles, ribs, slats
+  float detailW = 1.0 - smoothstep(0.25, 0.9, fw);  // whole window/balcony patterns
   bool isZ4 = zi == 3, isZ6 = zi == 5;
   float bw = zi == 0 ? 2.7 : (zi == 1 ? 3.8 : (isZ4 ? 4.0 : 3.2));
   float bay = floor(u / bw);
@@ -95,9 +100,9 @@ ${GLSL_COMMON}`)
         else if (sh > 0.5) {
           if (open > 0.5 && fHash(vec2(bay, seed)) > 0.15) {
             vec3 inside = vec3(0.16, 0.13, 0.10) * (0.8 + 0.4 * fHash(vec2(bay * 3.0, seed)));
-            col = inside; emis = vec3(1.0, 0.85, 0.6) * (0.25 + 0.9 * uNight) * 0.6;
+            col = inside; emis = vec3(1.0, 0.85, 0.6) * (0.02 + 0.9 * uNight) * 0.6;
           } else {
-            float rib = 0.5 + 0.5 * sin(y * 40.0);
+            float rib = mix(0.5, 0.5 + 0.5 * sin(y * 40.0), detail);
             col = mix(vec3(0.45, 0.47, 0.48), vec3(0.62, 0.63, 0.63), rib); rough = 0.55;
           }
         }
@@ -125,16 +130,16 @@ ${GLSL_COMMON}`)
       bool balcony = front && fHash(vec2(bay * 1.7, seed * 21.0)) > (zi == 2 || zi == 4 ? 0.45 : 0.75);
       if (balcony && lv < 0.38) {
         float slab = step(lv, 0.06);
-        float bar = step(0.6, fract(lu * 18.0));
+        float bar = mix(0.4, step(0.6, fract(lu * 18.0)), detail);
         col = slab > 0.5 ? plaster * 0.8 : mix(col * 0.55, vec3(0.18, 0.18, 0.2), bar * step(0.1, lv));
       } else if (hasWin && w > 0.5) {
         float wst = fHash(vec2(seed * 5.0, 1.0));
         vec3 glass = vec3(0.10, 0.13, 0.16);
         if (zi == 0 && wst < 0.6) {
           glass = mix(vec3(0.28, 0.20, 0.12), vec3(0.20, 0.40, 0.35), step(0.5, fHash(vec2(seed, 9.0)))); // painted wooden shutters
-          glass *= 0.75 + 0.25 * step(0.5, fract(lu * 6.0));
+          glass *= 0.75 + 0.25 * mix(0.5, step(0.5, fract(lu * 6.0)), detail);
         } else if (wst < 0.4) {
-          glass *= 1.0 - 0.6 * max(step(0.85, fract((lu - lo.x) * 16.0)), step(0.85, fract((lv - lo.y) * 10.0))); // grille
+          glass *= 1.0 - 0.6 * detail * max(step(0.85, fract((lu - lo.x) * 16.0)), step(0.85, fract((lv - lo.y) * 10.0))); // grille
         }
         col = glass; rough = 0.25;
         float lit = step(fHash(vec2(bay * 7.0 + seed * 101.0, floorIdx * 3.0)), mix(0.55, 0.2, step(23.0, uHour) + step(uHour, 5.0)));
@@ -149,7 +154,7 @@ ${GLSL_COMMON}`)
       }
     } else {
       // Industrial shed: corrugated sheet + a big shutter on front walls.
-      col *= 0.85 + 0.15 * sin(u * 25.0);
+      col *= 0.85 + 0.15 * sin(u * 25.0) * detail;
       if (front && fBox(vec2(fract(u / 12.0), y), vec2(0.3, 0.0), vec2(0.7, 4.5)) > 0.5) col = vec3(0.4, 0.42, 0.44);
       rough = 0.6;
     }
@@ -157,6 +162,13 @@ ${GLSL_COMMON}`)
     col = plaster * 0.95; // parapet band
   }
   if (kind > 1.5 && kind < 2.5) col *= 0.82; // shared walls exposed: unpainted, darker
+  // Far away: blend window patterns to their average so facades don't shimmer.
+  if (!solid && y > groundH && y < roofH && !isZ6) {
+    vec3 avg = mix(plaster, vec3(0.12, 0.13, 0.15), front ? 0.32 : 0.12);
+    col = mix(avg, col, detailW);
+    float litAvg = mix(0.45, 0.2, step(23.0, uHour) + step(uHour, 5.0)) * (front ? 0.3 : 0.1);
+    emis = mix(vec3(1.0, 0.86, 0.62) * litAvg * uNight * 0.85, emis, detailW);
+  }
   diffuseColor.rgb = col;`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
   roughnessFactor = rough;`)
