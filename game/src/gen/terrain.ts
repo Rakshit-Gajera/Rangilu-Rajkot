@@ -16,8 +16,11 @@ export function terrainMesh(tile: Tile): GeoBuf {
     for (let c = 0; c < n; c++) {
       const y = at(r, c);
       // Central-difference normal; three z = −north, so dz uses the north gradient negated.
-      const dx = (at(r, c + 1) - at(r, c - 1)) / (2 * SPACING);
-      const dn = (at(r + 1, c) - at(r - 1, c)) / (2 * SPACING);
+      // Central differences inside, one-sided at the tile edge (divide by the real span).
+      const cx0 = Math.max(c - 1, 0), cx1 = Math.min(c + 1, n - 1);
+      const ry0 = Math.max(r - 1, 0), ry1 = Math.min(r + 1, n - 1);
+      const dx = (at(r, cx1) - at(r, cx0)) / ((cx1 - cx0) * SPACING);
+      const dn = (at(ry1, c) - at(ry0, c)) / ((ry1 - ry0) * SPACING);
       let nx = -dx, ny = 1, nz = dn;
       const len = Math.hypot(nx, ny, nz);
       nx /= len; ny /= len; nz /= len;

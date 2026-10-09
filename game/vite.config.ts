@@ -1,6 +1,7 @@
 import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
 import { join, normalize, resolve } from 'node:path';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
+import type { Plugin } from 'vite';
 
 const WORLD = resolve(import.meta.dirname, '../world');
 
@@ -34,4 +35,5 @@ export default defineConfig({
   worker: { format: 'es' },
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
   server: { port: 5173 },
+  test: { include: ['tests/**/*.test.ts'] },
 });

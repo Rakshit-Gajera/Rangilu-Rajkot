@@ -45,6 +45,8 @@ describe('heightAt', () => {
     expect(heightAt(t, 0, 0)).toBe(0);
     expect(heightAt(t, 10, 0)).toBe(10);
     expect(heightAt(t, 5, 5)).toBe(15);
+    expect(heightAt(t, 7.5, 2.5)).toBeCloseTo(0 + 10 * 0.75 + 20 * 0.25); // lower-right triangle
+    expect(heightAt(t, 2.5, 7.5)).toBeCloseTo(0 + 20 * 0.75 + 10 * 0.25); // upper-left triangle
     expect(heightAt(t, -50, 999)).toBe(20);
   });
 });
