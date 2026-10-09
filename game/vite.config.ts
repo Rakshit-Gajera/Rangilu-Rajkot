@@ -2,7 +2,7 @@ import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
 import { join, normalize, resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 
-const WORLD = resolve(__dirname, '../world');
+const WORLD = resolve(import.meta.dirname, '../world');
 
 /** Serve the baked world package (../world) at /world in dev, and copy it into the build. */
 function worldPackage(): Plugin {
@@ -19,7 +19,7 @@ function worldPackage(): Plugin {
     },
     closeBundle() {
       if (existsSync(WORLD)) {
-        cpSync(WORLD, resolve(__dirname, 'dist/world'), {
+        cpSync(WORLD, resolve(import.meta.dirname, 'dist/world'), {
           recursive: true,
           filter: (src) => !src.includes('preview'),
         });
