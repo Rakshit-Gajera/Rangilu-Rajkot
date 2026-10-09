@@ -1,11 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { GeoBuf } from '../src/gen/geobuf';
 import { buildTile } from '../src/gen/tile';
+import { hasWorld, openWorld } from './world';
 
-const WORLD = resolve(__dirname, '../../world');
-const hasWorld = existsSync(resolve(WORLD, 'manifest.json'));
 
 /** Fraction of triangles whose geometric normal agrees with the stored vertex normal. */
 function windingAgreement(g: GeoBuf): number {
@@ -30,12 +27,8 @@ function finite(g: GeoBuf) {
 }
 
 describe.skipIf(!hasWorld)('tile generators', () => {
-  const manifest = JSON.parse(readFileSync(resolve(WORLD, 'manifest.json'), 'utf8'));
-  // The densest tile: Race Course / Jubilee area near the origin.
-  const entry = manifest.tiles['-1,0'] ?? Object.values(manifest.tiles)[0];
-  const [file, off, len] = entry as [string, number, number];
-  const buf = readFileSync(resolve(WORLD, 'packs', file));
-  const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  const { manifest, tile: load } = openWorld();
+  const [ab, off, len] = load('-1,0');
   const build = buildTile(ab, off, len, manifest.tileSize);
   const meshes: [string, GeoBuf][] = [
     ['terrain', build.terrain], ['walls', build.buildings.walls], ['roofs', build.buildings.roofs],

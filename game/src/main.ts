@@ -4,6 +4,7 @@ import { Player } from './actors/player';
 import { Scooter } from './actors/scooter';
 import { Audio } from './app/audio';
 import { Input } from './app/input';
+import { DynamicResolution, pickQuality } from './app/quality';
 import { Physics } from './physics/physics';
 import { worldUniforms } from './render/materials';
 import { Clock, Environment, goldenHour } from './render/sky';
@@ -30,15 +31,17 @@ async function main() {
 
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  const quality = pickQuality(params, renderer.getContext() as WebGL2RenderingContext);
+  const dynres = new DynamicResolution(Math.min(devicePixelRatio, quality.maxPixelRatio), quality.targetFps);
+  renderer.setPixelRatio(dynres.ratio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const shadowSize = params.get('shadows') === '0' ? 0 : 2048;
+  const shadowSize = params.get('shadows') === '0' ? 0 : quality.shadowSize;
   renderer.shadowMap.enabled = shadowSize > 0;
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.2, 6000);
+  const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.2, quality.stream.far + 1500);
   addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
     camera.aspect = innerWidth / innerHeight;
@@ -48,13 +51,12 @@ async function main() {
   status.textContent = 'Starting physics…';
   const physics = await Physics.create();
   status.textContent = 'Loading Rajkot…';
-  const world = await World.load('world', physics, shadowSize > 0);
+  const world = await World.load('world', physics, shadowSize > 0, quality.stream);
   scene.add(world.root);
 
   const spawn = world.manifest.spawn;
-  await world.ensure(spawn.x, spawn.z, 700, (d, t) => { bar.style.width = `${(100 * d) / t}%`; });
-  // The rest of the slice streams in the background.
-  void world.ensure(spawn.x, spawn.z, 3000);
+  // Playable once the ground around the spawn is in (PROMPT §8.1); the rest streams in the background.
+  await world.ensure(spawn.x, spawn.z, 350, (d, t) => { bar.style.width = `${(100 * d) / t}%`; });
 
   // Rapier scene queries only see new colliders after a step, so spawn heights come from the tile grid.
   const gy = world.terrainAt(spawn.x, spawn.z) ?? 30;
@@ -146,7 +148,13 @@ async function main() {
         : {});
     }
     env.update(clock, fixedView ? fixedView.look : focus, camera);
-    world.flushUploads(4);
+    {
+      const v = riding ? scooter.chassis.linvel() : { x: 0, z: 0 };
+      const p = fixedView ? fixedView.pos : riding ? scooter.position : player.position;
+      world.update(p.x, p.z, v.x, v.z, fixedView ? 50 : 4);
+    }
+    const res = dynres.sample(dt);
+    if (res !== null) renderer.setPixelRatio(res);
     renderer.render(scene, camera);
 
     // --- HUD ----------------------------------------------------------------------
@@ -165,7 +173,8 @@ async function main() {
       const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
       hud.setPerf(`fps ${(1 / Math.max(dt, 1e-3)).toFixed(0)}  cpu ${avg.toFixed(1)} ms\n` +
         `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M\n` +
-        `tiles ${s.tiles}  buildings ${s.buildings}  geo ${(info.memory.geometries)}\n` +
+        `quality ${quality.name}  res ${dynres.ratio.toFixed(2)}  near ${s.tiles}  far ${s.farTiles}  phys ${s.colliders}\n` +
+        `queue ${s.queued}  buildings ${s.buildings}  geo ${info.memory.geometries}\n` +
         `pos ${p.x.toFixed(0)}, ${(-p.z).toFixed(0)}  y ${p.y.toFixed(1)}`);
     } else hud.setPerf(null);
     input.endFrame();
@@ -176,6 +185,10 @@ async function main() {
   (window as unknown as { __game: unknown }).__game = {
     ready: true,
     simTime: () => simTime,
+    quality: () => quality.name,
+    idle: () => world.stats().queued === 0,
+    heap: () => (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0,
+    geometries: () => renderer.info.memory.geometries,
     stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, drawnTriangles: renderer.info.render.triangles,
       busy: world.tiles.size, frameMs: frameTimes.reduce((a, b) => a + b, 0) / Math.max(frameTimes.length, 1) }),
     setView: (pos: number[], look: number[], hour?: number) => {

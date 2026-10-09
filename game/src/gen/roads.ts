@@ -1,4 +1,5 @@
 import { AREA_SAND, AREA_WATER, heightAt, type MeshEntry, type RoadLine, type Tile } from '../world/rtile';
+import { triangulate } from './polys';
 import { Builder, type GeoBuf } from './geobuf';
 
 const ROAD_LIFT = 0.05;
@@ -184,7 +185,7 @@ function pier(b: Builder, x: number, y0: number, z: number, y1: number, color: n
 export function roadMeshes(tile: Tile, swx: number, swn: number): RoadMeshes {
   const br = bridges(tile);
   return {
-    surfaces: drape(tile, tile.roadSurfaces, ROAD_LIFT, 'surface', swx, swn),
+    surfaces: drape(tile, tile.roadSurfaces.map((e) => triangulate(e, 10)), ROAD_LIFT, 'surface', swx, swn),
     markings: markings(tile),
     bridges: br.mesh,
     bridgeCollider: br.collider,
@@ -192,9 +193,11 @@ export function roadMeshes(tile: Tile, swx: number, swn: number): RoadMeshes {
 }
 
 export function areaMeshes(tile: Tile, swx: number, swn: number): AreaMeshes {
+  // Water is a flat surface (no grid split); grass and riverbeds follow the ground.
+  const areas = tile.areas.map((e) => triangulate(e, e.code === AREA_WATER ? undefined : 10));
   return {
-    grass: drape(tile, tile.areas, 0.025, null, swx, swn, (e) => e.code !== AREA_WATER && e.code !== AREA_SAND),
-    water: drape(tile, tile.areas, 0, null, swx, swn, (e) => e.code === AREA_WATER, (e) => e.level ?? 0),
-    sand: drape(tile, tile.areas, 0.015, null, swx, swn, (e) => e.code === AREA_SAND),
+    grass: drape(tile, areas, 0.025, null, swx, swn, (e) => e.code !== AREA_WATER && e.code !== AREA_SAND),
+    water: drape(tile, areas, 0, null, swx, swn, (e) => e.code === AREA_WATER, (e) => e.level ?? 0),
+    sand: drape(tile, areas, 0.015, null, swx, swn, (e) => e.code === AREA_SAND),
   };
 }

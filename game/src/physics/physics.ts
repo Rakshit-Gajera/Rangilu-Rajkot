@@ -1,6 +1,18 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { TileBuild } from '../gen/tile';
 
+/**
+ * Rapier heightfield data for a tile height grid (n × n, row 0 = south, 10 m spacing).
+ * Rapier's field is centred on the body, rows run along +z (= south), columns along +x, column-major.
+ */
+export function heightfieldData(heights: Float32Array, n: number): Float32Array {
+  const out = new Float32Array(n * n);
+  for (let col = 0; col < n; col++) {
+    for (let row = 0; row < n; row++) out[col * n + row] = heights[(n - 1 - row) * n + col];
+  }
+  return out;
+}
+
 export type Rapier = typeof RAPIER;
 
 /** Collision groups (PROMPT §9.1): membership << 16 | filter. */
@@ -23,8 +35,17 @@ export class Physics {
     return new Physics(RAPIER);
   }
 
-  /** Static trimesh colliders for a tile's terrain, buildings and bridge decks. */
+  hasTile(key: string) {
+    return this.tileColliders.has(key);
+  }
+
+  get tileCount() {
+    return this.tileColliders.size;
+  }
+
+  /** Static colliders for a tile: heightfield terrain, trimesh buildings and bridge decks. */
   addTile(b: TileBuild) {
+    if (this.tileColliders.has(b.key)) return;
     const R = this.R;
     const body = this.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(b.swx, 0, -b.swn));
     const cols: RAPIER.Collider[] = [];
@@ -33,7 +54,10 @@ export class Physics {
       const d = R.ColliderDesc.trimesh(pos, idx).setCollisionGroups(groups(GROUP_WORLD, 0xffff)).setFriction(0.9);
       cols.push(this.world.createCollider(d, body));
     };
-    add(b.terrain.position, b.terrain.index);
+    const span = (b.hn - 1) * 10;
+    const hf = R.ColliderDesc.heightfield(b.hn - 1, b.hn - 1, heightfieldData(b.heights, b.hn), { x: span, y: 1, z: span })
+      .setTranslation(span / 2, 0, -span / 2).setCollisionGroups(groups(GROUP_WORLD, 0xffff)).setFriction(0.9);
+    cols.push(this.world.createCollider(hf, body));
     add(b.buildings.collider.position, b.buildings.collider.index);
     add(b.roads.bridgeCollider.position, b.roads.bridgeCollider.index);
     this.tileColliders.set(b.key, cols);

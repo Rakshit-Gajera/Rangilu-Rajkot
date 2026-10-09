@@ -2,6 +2,7 @@ import { decodeTile, type Tile } from '../world/rtile';
 import { buildingMeshes, type BuildingMeshes } from './buildings';
 import { transferables, type GeoBuf } from './geobuf';
 import { areaMeshes, roadMeshes, type AreaMeshes, type RoadMeshes } from './roads';
+import { farMesh, type FarBuild } from './far';
 import { terrainMesh } from './terrain';
 
 /** Everything the main thread needs to show and collide with one tile. */
@@ -69,4 +70,19 @@ export function tileTransferables(b: TileBuild): ArrayBuffer[] {
   for (const c of [b.buildings.collider, b.roads.bridgeCollider]) out.push(c.position.buffer as ArrayBuffer, c.index.buffer as ArrayBuffer);
   for (const r of b.minimapRoads) out.push(r.buffer as ArrayBuffer);
   return out;
+}
+
+export function buildFarTile(buf: ArrayBuffer, off: number, len: number, tileSize: number): FarBuild {
+  const t0 = performance.now();
+  const tile = decodeTile(buf, off, len);
+  const mesh = farMesh(tile);
+  return {
+    key: `${tile.i},${tile.j}`, i: tile.i, j: tile.j, swx: tile.i * tileSize, swn: tile.j * tileSize,
+    heights: tile.heights, hn: tile.hn, mesh,
+    stats: { triangles: mesh.index.length / 3, ms: performance.now() - t0 },
+  };
+}
+
+export function farTransferables(b: FarBuild): ArrayBuffer[] {
+  return transferables(b.mesh, [b.heights.buffer as ArrayBuffer]);
 }

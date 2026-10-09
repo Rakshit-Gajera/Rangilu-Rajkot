@@ -233,3 +233,19 @@ export function waterMaterial(): THREE.MeshStandardMaterial {
 export function sandMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color: 0x9c8a68, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 }
+
+/** Far-LOD tiles: vertex colours, cheap Lambert shading, and a faint glow of lit windows at night. */
+export function farMaterial(): THREE.MeshLambertMaterial {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uNight = worldUniforms.uNight;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float glow; varying float vGlow;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = glow;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uNight; varying float vGlow;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(1.0, 0.72, 0.42) * vGlow * uNight * 0.06;');
+  };
+  m.customProgramCacheKey = () => 'far-v1';
+  return m;
+}

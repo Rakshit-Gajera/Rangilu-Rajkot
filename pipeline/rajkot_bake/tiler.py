@@ -5,12 +5,12 @@ Format: docs/RTILE.md. Output: world/manifest.json, world/strings.json, world/pa
 
 from __future__ import annotations
 
+import gzip
 import json
 import struct
 from collections import defaultdict
 
 import geopandas as gpd
-import mapbox_earcut as earcut
 import numpy as np
 import shapely
 from scipy import ndimage
@@ -20,7 +20,7 @@ from shapely.geometry import box
 from . import config as C
 from .report import USES
 
-VERSION = 1
+VERSION = 2
 N_H = 51
 SURF_ORDER = ["asphalt", "paving", "concrete", "dirt"]  # priority where surfaces overlap
 SURF_CODE = {"asphalt": 0, "concrete": 1, "paving": 2, "dirt": 3}
@@ -97,51 +97,28 @@ def _road_points(roads: gpd.GeoDataFrame, terrain: Terrain) -> list[np.ndarray]:
     return out
 
 
-def _triangulate(pieces, sw: tuple[float, float]) -> tuple[np.ndarray, np.ndarray]:
-    verts, idx, base = [], [], 0
-    for g in pieces:
-        for poly in getattr(g, "geoms", [g]):
+def _poly_block(entries: list[tuple[int, float | None, object]], sw: tuple[float, float], has_level) -> bytes:
+    """Polygons (with holes) per class, tile-local dm. Triangulated and draped at runtime (docs/RTILE.md v2)."""
+    out = [struct.pack("<B", len(entries))]
+    for code, level, geom in entries:
+        polys = []
+        for poly in getattr(geom, "geoms", [geom]):
             if poly.geom_type != "Polygon" or poly.area < 0.05:
                 continue
+            poly = shapely.simplify(poly, 0.1, preserve_topology=True)
             rings = [np.asarray(poly.exterior.coords)[:-1]] + [np.asarray(r.coords)[:-1] for r in poly.interiors]
-            v = np.vstack(rings)
-            ends = np.cumsum([len(r) for r in rings]).astype(np.uint32)
-            tri = earcut.triangulate_float64(v, ends)
-            if len(tri) == 0:
-                continue
-            verts.append(v - sw)
-            idx.append(tri.astype(np.int64) + base)
-            base += len(v)
-    if not verts:
-        return np.zeros((0, 2)), np.zeros(0, np.int64)
-    return np.vstack(verts), np.concatenate(idx)
-
-
-def _grid_split(geom, sw: tuple[float, float], ts: float, cell: float = 10.0):
-    """Cut a polygon on the terrain grid so each piece lies inside one 10 m cell."""
-    if geom.is_empty:
-        return []
-    k = int(ts / cell)
-    xs = sw[0] + np.arange(k) * cell
-    ys = sw[1] + np.arange(k) * cell
-    gx, gy = np.meshgrid(xs, ys)
-    cells = shapely.box(gx.ravel(), gy.ravel(), gx.ravel() + cell, gy.ravel() + cell)
-    hit = STRtree(cells).query(geom, predicate="intersects")
-    pieces = shapely.intersection(cells[hit], geom)
-    return [p for p in pieces if not p.is_empty]
-
-
-def _mesh_block(entries: list[tuple[int, int | None, np.ndarray, np.ndarray]]) -> bytes:
-    out = [struct.pack("<B", len(entries))]
-    for code, level, v, i in entries:
-        if len(v) > 65535:
-            raise ValueError(f"mesh entry with {len(v)} vertices exceeds u16 indices")
+            rings = [r for r in rings if len(r) >= 3]
+            if rings:
+                polys.append(rings)
         out.append(struct.pack("<B", code))
-        if level is not None:
-            out.append(struct.pack("<h", int(dm(level))))
-        out.append(struct.pack("<II", len(v), len(i)))
-        out.append(dm(v).tobytes())
-        out.append(i.astype("<u2").tobytes())
+        if has_level(code):
+            out.append(struct.pack("<h", int(dm(level or 0.0))))
+        out.append(struct.pack("<H", len(polys)))
+        for rings in polys:
+            out.append(struct.pack("<B", len(rings)))
+            for r in rings:
+                out.append(struct.pack("<H", len(r)))
+                out.append(dm(r - sw).tobytes())
     return b"".join(out)
 
 
@@ -266,30 +243,26 @@ def run(cfg: C.Config) -> None:
             u = u.difference(taken)
             taken = taken.union(u)
             u = u.intersection(tbox)
-            v, tri = _triangulate(_grid_split(u, sw, ts), sw)
-            if len(tri):
-                entries.append((SURF_CODE[s], None, v, tri))
-        sections.append((b"RDSF", _mesh_block(entries)))
+            if not u.is_empty:
+                entries.append((SURF_CODE[s], None, u))
+        sections.append((b"RDSF", _poly_block(entries, sw, lambda c: False)))
         road_union = taken
 
         entries = []
         gsel = green.geometry.values[green_tree.query(tbox, predicate="intersects")]
         if len(gsel):
             gu = shapely.union_all(gsel).intersection(tbox).difference(road_union)
-            v, tri = _triangulate(_grid_split(gu, sw, ts), sw)
-            if len(tri):
-                entries.append((AREA_GRASS, None, v, tri))
+            if not gu.is_empty:
+                entries.append((AREA_GRASS, None, gu))
         for k in water_tree.query(tbox, predicate="intersects"):
             wg = water.geometry.values[k].intersection(tbox)
+            if wg.is_empty:
+                continue
             if water.river.values[k]:
-                v, tri = _triangulate(_grid_split(wg, sw, ts), sw)
-                if len(tri):
-                    entries.append((AREA_SAND, None, v, tri))  # dry riverbed outside the monsoon
+                entries.append((AREA_SAND, None, wg))  # dry riverbed outside the monsoon
             else:
-                v, tri = _triangulate([wg], sw)  # flat water surface: no grid split needed
-                if len(tri):
-                    entries.append((AREA_WATER, water.level.values[k], v, tri))
-        sections.append((b"AREA", _mesh_block(entries)))
+                entries.append((AREA_WATER, water.level.values[k], wg))
+        sections.append((b"AREA", _poly_block(entries, sw, lambda c: c == AREA_WATER)))
 
         lms = [(lm.iloc[k], p) for k, p in enumerate(lm_pts) if tbox.contains(p)]
         sections.append((b"LMRK", struct.pack("<H", len(lms)) + b"".join(
@@ -302,17 +275,21 @@ def run(cfg: C.Config) -> None:
 
     out = C.WORLD / "packs"
     out.mkdir(parents=True, exist_ok=True)
-    for old in out.glob("*.rpk"):
+    for old in [*out.glob("*.rpk"), *out.glob("*.rpk.gz")]:
         old.unlink()
     index = {}
+    pack_sizes = []
     for (pi, pj), items in packs.items():
-        name = f"r_{pi}_{pj}.rpk"
+        # Gzipped; offsets refer to the decompressed pack (the game inflates it with DecompressionStream).
+        name = f"r_{pi}_{pj}.rpk.gz"
         off, blob = 0, []
         for i, j, data in items:
             index[f"{i},{j}"] = [name, off, len(data)]
             blob.append(data)
             off += len(data)
-        (out / name).write_bytes(b"".join(blob))
+        z = gzip.compress(b"".join(blob), compresslevel=9, mtime=0)
+        (out / name).write_bytes(z)
+        pack_sizes.append(len(z))
 
     C.write_json(C.WORLD / "strings.json", strings.items)
     sp = tc["spawn"]
@@ -325,7 +302,10 @@ def run(cfg: C.Config) -> None:
     C.write_json(C.WORLD / "manifest.json", manifest)
     sizes = np.array(sizes)
     print(f"  {len(sizes)} tiles in {len(packs)} packs; tile size p50 {np.median(sizes) / 1e3:.0f} kB, "
-          f"max {sizes.max() / 1e3:.0f} kB, total {sizes.sum() / 1e6:.1f} MB")
+          f"max {sizes.max() / 1e3:.0f} kB, total {sizes.sum() / 1e6:.1f} MB raw, "
+          f"{sum(pack_sizes) / 1e6:.1f} MB gzipped (largest pack {max(pack_sizes) / 1e6:.2f} MB)")
+    if max(pack_sizes) > 4_000_000:
+        raise SystemExit("QA failed: a region pack exceeds 4 MB")
     big = int((sizes > 1_000_000).sum())
     if big:
         raise SystemExit(f"QA failed: {big} tiles exceed 1 MB")

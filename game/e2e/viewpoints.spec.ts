@@ -33,7 +33,8 @@ test('boots to playable and captures viewpoints', async ({ page }) => {
   mkdirSync(OUT, { recursive: true });
   const { errors, bootMs } = await boot(page);
   // Load the whole slice before the fixed views.
-  await page.evaluate(() => (window as any).__game.ensure(-500, -500, 3000));
+  await page.waitForTimeout(1000);
+  await page.waitForFunction(() => (window as any).__game.idle(), null, { timeout: 120_000 });
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}/00-spawn-third-person.png` });
   const results: Record<string, unknown> = { bootMs };
@@ -45,7 +46,9 @@ test('boots to playable and captures viewpoints', async ({ page }) => {
       return { pos: [cam[0], gc + cam[1], -cam[2]], look: [look[0], gl + look[1], -look[2]] };
     }, [v.cam, v.look] as const);
     await page.evaluate(([p, l, h]) => (window as any).__game.setView(p, l, h), [pose.pos, pose.look, v.hour] as const);
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(400);
+    await page.waitForFunction(() => (window as any).__game.idle(), null, { timeout: 120_000 });
+    await page.waitForTimeout(300);
     await page.screenshot({ path: `${OUT}/${v.name}.png` });
     results[v.name] = await page.evaluate(() => (window as any).__game.stats());
   }
