@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Rangilu Rajkot</title>
+  <link rel="stylesheet" href="./src/ui/style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud" hidden>
+    <canvas id="minimap" width="220" height="220"></canvas>
+    <div id="area"></div>
+    <div id="clock"></div>
+    <div id="speed"></div>
+    <div id="prompt"></div>
+    <div id="help">WASD move · Shift sprint · Space jump · E get on/off · H horn · T +1 hour · C camera · F3 stats</div>
+    <pre id="perf" hidden></pre>
+  </div>
+  <div id="loading">
+    <h1>Rangilu Rajkot <span lang="gu">રંગીલું રાજકોટ</span></h1>
+    <p id="loading-fact"></p>
+    <div class="bar"><i id="loading-bar"></i></div>
+    <p id="loading-status">Loading…</p>
+  </div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
