@@ -1,0 +1,7 @@
+# Copy to pipeline/local.yaml (git-ignored) for private, per-machine settings.
+# Never put personal locations in tracked files — the repo is public.
+personal_places:
+  home:
+    lat: 0.0
+    lon: 0.0
+    note: "Owner's home — used for a private spawn point / recognition check"
