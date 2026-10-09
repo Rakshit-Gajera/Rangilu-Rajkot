@@ -166,6 +166,17 @@ def run(cfg: C.Config) -> None:
     use[use == ""] = "residential"
     use[(use == "residential") & shop_gf] = "mixed"
 
+    # Estimated heights (GHSL cell averages, heuristics) can't exceed the zone's typical
+    # floor range (PROMPT §7.12); mapped heights from OSM/Overture are kept as they are.
+    caps = {int(k): v for k, v in hc["zone_max_levels"].items()}
+    estimated = g.height_source.isin(["ghsl", "heuristic"]).values
+    lv = g.levels.values.copy()
+    for z, cap in caps.items():
+        m = estimated & (zone == z) & (lv > cap)
+        lv[m] = cap
+    capped = int((lv != g.levels.values).sum())
+    g["levels"] = lv
+
     # --- Metric height (PROMPT §7.5) -----------------------------------------
     lo, hi = hc["clamp"]
     height = np.empty(n)
@@ -182,4 +193,5 @@ def run(cfg: C.Config) -> None:
     g.to_parquet(C.interim("buildings_c.parquet"))
     print("  use:", pd.Series(use).value_counts().to_dict())
     print("  zone:", {ZONE_NAMES[k]: int(v) for k, v in sorted(pd.Series(zone).value_counts().items())})
+    print(f"  capped to zone floor range: {capped}")
     print(f"  shop ground floor: {int(shop_gf.sum())}; worship: {pd.Series(worship).value_counts().to_dict()}")

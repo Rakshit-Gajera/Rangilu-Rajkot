@@ -71,6 +71,8 @@ heights:
   parapet: [0.9, 1.1]
   clamp: [3.0, 100.0]
   review_above: 60.0
+  # Max floors for estimated heights per style zone (old city 2-4, heritage 1-3, industrial and outskirts 1-2).
+  zone_max_levels: {1: 4, 2: 3, 6: 2, 7: 3}
 
 qa:
   # Checks allowed to fail without failing the bake, with the reason (DECISIONS.md).
