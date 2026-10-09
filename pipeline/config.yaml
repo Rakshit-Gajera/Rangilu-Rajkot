@@ -76,3 +76,8 @@ qa:
   # Checks allowed to fail without failing the bake, with the reason (DECISIONS.md).
   waivers:
     landmarks_located: "P0: six landmarks need positions from Rakshit"
+
+tiler:
+  only_slice: true            # P1: encode only the vertical-slice tiles
+  slice: [-2000, 1000, -500, 1500]   # x_min, x_max, n_min, n_max (m from origin)
+  spawn: {x: -1067, n: 473, heading: 0}   # Race Course Ring Road (PROMPT §3.1)
