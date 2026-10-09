@@ -1,0 +1,63 @@
+# Rangilu Rajkot bake configuration. Distances in metres, angles in degrees.
+
+fetch:
+  # Raw-data bbox (lon_min, lat_min, lon_max, lat_max). Wider than the playable
+  # area so it covers the Darshan University corridor and the horizon ring.
+  bbox: [70.60, 22.10, 71.00, 22.55]
+  sources:
+    osm:
+      url: https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf
+      file: osm/western-zone-latest.osm.pbf
+    dem:
+      url: https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N22_00_E070_00_DEM/Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif
+      file: dem/Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif
+    overture_buildings:
+      file: overture/overture_buildings.parquet
+
+crs: "EPSG:32642"   # UTM zone 42N
+
+world:
+  # Origin near Trikon Baug (PROMPT §7.1). Trikon Baug is not in OSM; point from
+  # Overture places "Trikonbaug Ka Raja" (meta). Confidence: medium. See refs/SOURCES.md.
+  origin:
+    lonlat: [70.80185, 22.29487]
+    source: "Overture places: Trikonbaug Ka Raja"
+  y_offset: 100.0           # y = elevation - y_offset
+  # No RMC polygon in OSM/Overture -> city core = these OSM urban talukas
+  # + OSM place=city polygon + dense built-up area (DECISIONS.md).
+  urban_talukas: ["Rajkot East Taluka", "Rajkot West Taluka", "Rajkot South Taluka"]
+  builtup:
+    cell: 200.0             # grid cell size
+    min_cover: 0.08         # building footprint share that counts as built-up
+  rmc_buffer: 1500.0        # playable = city core + this buffer
+  # Lake reference points (Overture places, meta); snapped to the nearest OSM water polygon.
+  lakes:
+    Aji-1: [70.83608, 22.27047]
+    Nyari-1: [70.70801, 22.24772]
+    Lalpari: [70.83456, 22.31345]
+    Randarda: [70.84485, 22.29339]
+  lake_buffer: 200.0
+  # Extra playable areas beyond the city (PROMPT §0.1 item 5).
+  extras:
+    - name: "Darshan University"
+      lonlat: null          # PENDING: Overture point is mis-geocoded; awaiting Rakshit's pin
+      buffer: 600.0
+      corridor_road: "Morbi"
+      corridor_width: 300.0
+  horizon_ring: 3000.0
+  tile_size: 500.0
+
+buildings:
+  min_area: 12.0
+  simplify_tolerance: 0.4
+  square_angle_tolerance: 8.0
+  giant_area: 20000.0
+  iou_match: 0.5
+  frontage_distance: 8.0
+
+heights:
+  floor_height: 3.1
+  shop_ground_floor: [3.6, 4.2]
+  parapet: [0.9, 1.1]
+  clamp: [3.0, 100.0]
+  review_above: 60.0
