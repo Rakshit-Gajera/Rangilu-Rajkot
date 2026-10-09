@@ -21,7 +21,7 @@ function worldPackage(): Plugin {
       if (existsSync(WORLD)) {
         cpSync(WORLD, resolve(import.meta.dirname, 'dist/world'), {
           recursive: true,
-          filter: (src) => !src.includes('preview'),
+          filter: (src: string) => !src.includes('preview'),
         });
       }
     },

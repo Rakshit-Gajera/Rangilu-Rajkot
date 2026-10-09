@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Gujarati:wght@400;600&display=swap');
+
+:root {
+  --ink: #fff8ec;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  --accent: #f59e0b;
+  font-family: 'Noto Sans', 'Noto Sans Gujarati', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: var(--ink); }
+#game { display: block; width: 100vw; height: 100vh; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; text-shadow: var(--shadow); }
+#minimap { position: absolute; left: 16px; bottom: 16px; width: 220px; height: 220px; border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(255, 255, 255, 0.6); }
+#clock { position: absolute; right: 18px; top: 14px; font-size: 22px; font-weight: 700; letter-spacing: 0.04em; }
+#speed { position: absolute; right: 18px; bottom: 18px; font-size: 34px; font-weight: 700; }
+#area { position: absolute; left: 50%; top: 9vh; transform: translateX(-50%); font-size: 26px; font-weight: 600;
+  opacity: 0; white-space: nowrap; }
+#area.show { animation: area 4s ease forwards; }
+@keyframes area { 0% { opacity: 0; transform: translate(-50%, 8px); } 12%, 70% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+#prompt { position: absolute; left: 50%; bottom: 14vh; transform: translateX(-50%); font-size: 18px;
+  background: rgba(0, 0, 0, 0.45); padding: 6px 14px; border-radius: 8px; opacity: 0; transition: opacity 0.2s; }
+#help { position: absolute; left: 252px; bottom: 18px; font-size: 12px; opacity: 0.75; }
+#perf { position: absolute; left: 12px; top: 10px; margin: 0; font: 12px/1.35 ui-monospace, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.55); padding: 6px 9px; border-radius: 6px; }
+
+#loading { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px;
+  background: radial-gradient(circle at 50% 40%, #3a2716, #120d09 70%); padding: 16px; transition: opacity 0.6s; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading h1 { margin: 0; font-size: clamp(28px, 6vw, 52px); color: #ffd28a; }
+#loading h1 span { display: block; font-size: 0.55em; font-family: 'Noto Sans Gujarati', sans-serif; color: #f6b35c; }
+#loading-fact { max-width: 520px; min-height: 2.8em; opacity: 0.85; }
+.bar { width: min(420px, 80vw); height: 6px; background: rgba(255, 255, 255, 0.15); border-radius: 3px; overflow: hidden; margin: 8px auto; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+#loading-status { font-size: 13px; opacity: 0.6; }
+
+@media (max-width: 700px) {
+  #minimap { width: 140px; height: 140px; left: 10px; bottom: 10px; }
+  #help { display: none; }
+}

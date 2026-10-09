@@ -20,6 +20,8 @@ export interface TileBuild {
   areas: AreaMeshes;
   /** Road centrelines for the minimap: per road [rank, ...x, n pairs] in world metres (x, n). */
   minimapRoads: Float32Array[];
+  /** strings.json index per minimap road (0xFFFFFFFF = unnamed). */
+  minimapRoadNames: number[];
   landmarks: { name: number; x: number; n: number }[];
   stats: { buildings: number; triangles: number; ms: number };
 }
@@ -32,7 +34,9 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const buildings = buildingMeshes(tile);
   const roads = roadMeshes(tile, swx, swn);
   const areas = areaMeshes(tile, swx, swn);
-  const minimapRoads = tile.roads.filter((r) => !r.tunnel).map((r) => {
+  const shown = tile.roads.filter((r) => !r.tunnel);
+  const minimapRoadNames = shown.map((r) => r.name);
+  const minimapRoads = shown.map((r) => {
     const n = r.points.length / 3;
     const out = new Float32Array(1 + 2 * n);
     out[0] = r.rank;
@@ -47,7 +51,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const triangles = geos.reduce((s, g) => s + g.index.length / 3, 0);
   return {
     key: `${tile.i},${tile.j}`, i: tile.i, j: tile.j, swx, swn, heights: tile.heights, hn: tile.hn,
-    terrain, buildings, roads, areas, minimapRoads,
+    terrain, buildings, roads, areas, minimapRoads, minimapRoadNames,
     landmarks: tile.landmarks.map((l) => ({ name: l.name, x: swx + l.x, n: swn + l.n })),
     stats: { buildings: tile.buildings.length, triangles, ms: performance.now() - t0 },
   };
