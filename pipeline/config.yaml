@@ -50,7 +50,7 @@ world:
   # Extra playable areas beyond the city (PROMPT §0.1 item 5).
   extras:
     - name: "Darshan University"
-      lonlat: null          # PENDING: Overture point is mis-geocoded; awaiting Rakshit's pin
+      lonlat: [70.7831, 22.4411]  # from Rakshit (Google search); matches campus footprints, 183 m from the highway
       buffer: 600.0
       corridor_road: "Morbi"
       corridor_width: 300.0

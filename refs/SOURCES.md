@@ -22,7 +22,8 @@ Confidence: **high** = mapped feature/outline in OSM; **medium** = single POI po
 - Address "At. Hadala, Rajkot–Morbi Highway, Nr. Water Sump, PIN 363650":
   [spoken-tutorial.org](https://spoken-tutorial.org/software-training/academic-center/653),
   [collegebatch.com](https://www.collegebatch.com/3756-darshan-university-contact-number-address-map-rajkot);
-  "on SH 24": [targetadmission.com](https://www.targetadmission.com/colleges/4235-darshan-institute-of-engineering-technology-for-diploma-studies-rajkot). Confidence: high for the village, **position unknown**.
+  "on SH 24": [targetadmission.com](https://www.targetadmission.com/colleges/4235-darshan-institute-of-engineering-technology-for-diploma-studies-rajkot). Confidence: high for the village.
+- **Position: 22.4411 N, 70.7831 E** — supplied by Rakshit (Google search), cross-checked: 202 Overture buildings (2.8 ha) within ~600 m and 183 m from the OSM Rajkot–Morbi Highway. Confidence: medium-high.
 - Hadala village polygon in OSM: w1062608764 (centroid ≈ 70.762 E, 22.441 N).
 - Overture place "Darshan University" at 70.81844, 22.32745 is **rejected**: it's ~13 km south of Hadala, contradicting its own address.
 

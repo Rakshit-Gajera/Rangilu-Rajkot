@@ -58,3 +58,9 @@ Format: date · decision · why · alternatives considered.
 - **Seeds are 64-bit** (blake2b-8); outlines are wound counter-clockwise.
 - **QA failures exit non-zero** unless waived in `config.yaml → qa.waivers`. P0 waiver: `landmarks_located` (six landmarks need Rakshit's input; Trimandir is ambiguous).
 - **The preview map excludes private places** unless `report --private` is passed.
+
+## 2026-10-09 · Gate P0 answers from Rakshit
+- Darshan University at 22.4411 N, 70.7831 E; playable area extended by a 600 m-wide corridor along the Rajkot–Morbi Highway (now 296 km², 21 × 28.5 km, 1,308 tiles; coordinates reach ~16 km north of the origin — float32 precision still ~2 mm).
+- The brown Z1 zone matches the old bazaar area.
+- Buildings around Race Course are 5–10 floors, consistent with GHSL; keep the GHSL-based heights.
+- Still open: Dharmendra Rd, Lakhajiraj Rd, Sadar Bazaar, Connaught Hall, Ramvan, Trimandir (waiver stays).

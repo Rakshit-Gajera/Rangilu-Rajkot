@@ -10,37 +10,37 @@ Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
 | Overlapping buildings < 0.5 % | PASS | 0.00% (0) overlap > 1 m² |
 | Largest road component ≥ 98 % of drivable length | PASS | 99.5% |
 | Every tile ≤ 1 MB | — | n/a until tiles are encoded (P1/P2) |
-| Every landmark located (unambiguous, inside the playable area) | WAIVED (P0: six landmarks need positions from Rakshit) | missing/ambiguous: connaught_hall, dharmendra_road, lakhajiraj_road, sadar_bazaar, ramvan, trimandir, darshan_university; outside playable: none |
+| Every landmark located (unambiguous, inside the playable area) | WAIVED (P0: six landmarks need positions from Rakshit) | missing/ambiguous: connaught_hall, dharmendra_road, lakhajiraj_road, sadar_bazaar, ramvan, trimandir; outside playable: none |
 
 ## World frame
 
 - Projection EPSG:32642; origin [70.80185, 22.29487] (Overture places: Trikonbaug Ka Raja), E 685623 N 2466573.
-- Playable area 290.4 km², extent 21.0 × 19.8 km; horizon ring 3 km.
-- Tiles: 1259 active of a 43 × 40 grid (500 m).
+- Playable area 296.4 km², extent 21.0 × 28.5 km; horizon ring 3 km.
+- Tiles: 1308 active of a 43 × 57 grid (500 m).
 - Lakes matched: Aji-1, Nyari-1, Lalpari, Randarda.
 
 ## Buildings
 
-- Final buildings: **149,846** in the playable area (raw bbox: 337,856 Overture buildings, 12,695 OSM building outlines).
+- Final buildings: **151,780** in the playable area (raw bbox: 337,856 Overture buildings, 12,695 OSM building outlines).
 | Outline source | Buildings |
 |---|---|
-| Microsoft ML | 73251 |
-| Google Open Buildings | 64108 |
-| OpenStreetMap | 12487 |
+| Microsoft ML | 74356 |
+| Google Open Buildings | 64921 |
+| OpenStreetMap | 12503 |
 
 | Height source | Buildings |
 |---|---|
-| ghsl | 138,692 (92.6%) |
-| heuristic | 11,139 (7.4%) |
+| ghsl | 140,242 (92.4%) |
+| heuristic | 11,523 (7.6%) |
 | osm_levels | 13 (0.0%) |
 | osm_height | 2 (0.0%) |
 
 | Floors | Buildings |
 |---|---|
-| 1 | 45,810 |
-| 2 | 50,043 |
-| 3 | 33,844 |
-| 4 | 12,844 |
+| 1 | 47,145 |
+| 2 | 50,477 |
+| 3 | 33,985 |
+| 4 | 12,868 |
 | 5 | 4,221 |
 | 6 | 1,626 |
 | 7 | 736 |
@@ -58,40 +58,40 @@ Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
 |---|---|
 | Z1 Old city | 4,494 |
 | Z2 Heritage | 127 |
-| Z3 Societies | 119,425 |
+| Z3 Societies | 120,488 |
 | Z4 Commercial corridor | 1,698 |
 | Z5 New high-rise | 4,356 |
-| Z6 Industrial | 1,664 |
-| Z7 Outskirts | 18,082 |
+| Z6 Industrial | 1,762 |
+| Z7 Outskirts | 18,855 |
 
 | Use | Buildings |
 |---|---|
-| residential | 145,595 |
+| residential | 147,428 |
 | mixed | 1,756 |
-| industrial | 1,657 |
+| industrial | 1,755 |
 | healthcare | 276 |
 | educational | 262 |
-| religious | 149 |
-| commercial | 90 |
+| religious | 151 |
+| commercial | 91 |
 | civic | 60 |
 | transport | 1 |
 
-- Shop ground floor: 1,842; corner plots: 18,152; shared-wall buildings: 35,631; outlines squared: 104,112.
+- Shop ground floor: 1,843; corner plots: 18,250; shared-wall buildings: 35,885; outlines squared: 105,770.
 - Flagged for review: 1 giant outlines (> 20,000 m²), 0 heights > 60 m.
 
 ## Roads
 
-- Drivable length 3295.9 km; 29 connected components.
+- Drivable length 3336.2 km; 34 connected components.
 | OSM class | km |
 |---|---|
-| residential | 2278.0 |
-| tertiary | 375.6 |
-| service | 246.9 |
-| track | 145.6 |
-| primary | 115.1 |
-| unclassified | 95.8 |
+| residential | 2291.9 |
+| tertiary | 376.7 |
+| service | 252.3 |
+| track | 148.9 |
+| primary | 133.4 |
+| unclassified | 96.8 |
 | trunk | 88.4 |
-| secondary | 76.5 |
+| secondary | 76.8 |
 | footway | 9.6 |
 | living_street | 8.8 |
 | pedestrian | 7.8 |
@@ -106,12 +106,12 @@ Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
 
 | Width rule | km |
 |---|---|
-| class_default | 3354.5 |
-| lanes | 95.8 |
+| class_default | 3394.3 |
+| lanes | 99.5 |
 | name_feet | 14.4 |
 
 - Roads whose name gives the width: 150 Foot Ring Road, 150 Foot Ring Road Flyover, 150 feet ring road, 150Feet Ring Road Railway Flyover, 40 ft. road, BRTS Route (150 ft. Ring Road), Nana Mava Circle Flyover, Shahid Flyover.
-- Bridges/flyovers: 45.25 km.
+- Bridges/flyovers: 45.65 km.
 
 ## Landmarks
 
@@ -147,7 +147,7 @@ Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
 | Saurashtra University campus | high | located | yes |  |
 | Old Rajkot airport airstrip | high | located | yes |  |
 | Trimandir | low | ambiguous | yes | Two candidate points 10 km apart. Needs Rakshit. |
-| Darshan University (Hadala, Rajkot-Morbi Highway) | low | missing | no | Owner's college, added in PROMPT §0.1. Address "At. Hadala, Rajkot-Morbi Highway, Nr. Water Sump" (several college directories). The Overture point (70.81844, 22.32745) contradicts the address (13 km south of Hadala), so it is not used. Needs a pin from Rakshit. |
+| Darshan University (Hadala, Rajkot-Morbi Highway) | medium | approx | yes | Owner's college, added in PROMPT §0.1. Address "At. Hadala, Rajkot-Morbi Highway, Nr. Water Sump" (several college directories). The Overture point (70.81844, 22.32745) contradicts the address (13 km south of Hadala), so it is not used. Needs a pin from Rakshit. |
 
 ## POIs
 

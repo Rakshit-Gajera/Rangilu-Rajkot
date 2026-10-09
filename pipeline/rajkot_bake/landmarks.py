@@ -34,8 +34,8 @@ def run(cfg: C.Config) -> None:
                     if len(hit):
                         geoms.append(hit.geometry.iloc[0])
                         break
-            elif "overture" in ref:
-                geoms.append(Point(*to_utm.transform(*ref["overture"])))
+            elif "overture" in ref or "point" in ref:
+                geoms.append(Point(*to_utm.transform(*(ref.get("overture") or ref["point"]))))
             elif "lake" in ref:
                 hit = lakes[lakes.name == ref["lake"]]
                 if len(hit):

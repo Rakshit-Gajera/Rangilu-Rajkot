@@ -135,8 +135,8 @@ landmarks:
     note: Two candidate points 10 km apart. Needs Rakshit.
   - id: darshan_university
     name: Darshan University (Hadala, Rajkot-Morbi Highway)
-    refs: []
-    confidence: low
+    refs: [{point: [70.7831, 22.4411], what: "Rakshit (Google), cross-checked with a 202-building footprint cluster"}]
+    confidence: medium
     note: >-
       Owner's college, added in PROMPT §0.1. Address "At. Hadala, Rajkot-Morbi Highway, Nr. Water Sump"
       (several college directories). The Overture point (70.81844, 22.32745) contradicts the address
