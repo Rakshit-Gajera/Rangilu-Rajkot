@@ -50,12 +50,21 @@ test('boots to playable and captures viewpoints', async ({ page }) => {
   expect(bootMs).toBeLessThan(60_000);
 });
 
+/** Wait for simulated (not wall-clock) seconds; needs ?fixedstep=1. */
+const waitSim = (page: Page, secs: number) => page.evaluate((d) => new Promise<void>((r) => {
+  const g = (window as any).__game;
+  const t0 = g.simTime();
+  const f = () => (g.simTime() - t0 >= d ? r() : requestAnimationFrame(f));
+  f();
+}), secs);
+
 test('walks and rides the scooter without falling through the world', async ({ page }) => {
-  await boot(page);
+  await page.goto('/?fixedstep=1&shadows=0');
+  await page.waitForFunction(() => (window as any).__game?.ready, null, { timeout: 120_000 });
   const start = await page.evaluate(() => (window as any).__game.player());
   await page.locator('#game').click();
   await page.keyboard.down('KeyW');
-  await page.waitForTimeout(2500);
+  await waitSim(page, 2.5);
   await page.keyboard.up('KeyW');
   const after = await page.evaluate(() => (window as any).__game.player());
   const walked = Math.hypot(after[0] - start[0], after[2] - start[2]);
@@ -65,15 +74,23 @@ test('walks and rides the scooter without falling through the world', async ({ p
   // Walk back towards the scooter and get on.
   const s = await page.evaluate(() => (window as any).__game.scooter());
   await page.evaluate(([x, y, z]) => (window as any).__game.teleportPlayer?.(x - 1.5, y, z), s.pos);
-  await page.waitForTimeout(300);
+  await waitSim(page, 0.3);
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(200);
+  await waitSim(page, 0.2);
   expect((await page.evaluate(() => (window as any).__game.scooter())).riding).toBe(true);
   await page.keyboard.down('KeyW');
-  await page.waitForTimeout(4000);
+  await waitSim(page, 4);
   await page.keyboard.up('KeyW');
   const ride = await page.evaluate(() => (window as any).__game.scooter());
   const moved = Math.hypot(ride.pos[0] - s.pos[0], ride.pos[2] - s.pos[2]);
-  expect(moved).toBeGreaterThan(5);
+  expect(moved).toBeGreaterThan(25); // ~0 -> 50 km/h in 4 s along the ring road
+  expect(ride.up[1]).toBeGreaterThan(0.9); // still upright
+  mkdirSync(OUT, { recursive: true });
+  await page.keyboard.down('KeyW');
+  await page.keyboard.down('KeyA');
+  await waitSim(page, 0.6);
+  await page.screenshot({ path: `${OUT}/06-riding-scooter.png` });
+  await page.keyboard.up('KeyA');
+  await page.keyboard.up('KeyW');
   expect(ride.pos[1]).toBeGreaterThan(s.pos[1] - 5);
 });

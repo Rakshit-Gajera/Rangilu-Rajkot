@@ -19,6 +19,8 @@ const FACTS = [
 ];
 const STEP = 1 / 60;
 const params = new URLSearchParams(location.search);
+// Test mode: every rendered frame advances exactly one physics step, independent of wall time.
+const FIXED_STEP = params.get('fixedstep') === '1';
 
 async function main() {
   const loadingEl = document.getElementById('loading')!;
@@ -58,7 +60,8 @@ async function main() {
   const gy = world.terrainAt(spawn.x, spawn.z) ?? 30;
   const player = new Player(physics, scene, spawn.x, gy, spawn.z);
   const sx = spawn.x + 2.2, sz = spawn.z + 1.0;
-  const scooter = new Scooter(physics, scene, sx, world.terrainAt(sx, sz) ?? gy, sz, spawn.heading + Math.PI / 2);
+  // Parked at the roadside facing along the ring road (yaw π = facing north).
+  const scooter = new Scooter(physics, scene, sx, world.terrainAt(sx, sz) ?? gy, sz, spawn.heading + Math.PI);
   const env = new Environment(scene, renderer, shadowSize);
   // Spawn in the golden hour: 40 minutes before today's real sunset in Rajkot (PROMPT §3.1).
   const clock = new Clock(params.has('hour') ? Number(params.get('hour')) : goldenHour());
@@ -77,11 +80,12 @@ async function main() {
   setTimeout(() => loadingEl.remove(), 700);
 
   let acc = 0;
+  let simTime = 0;
   let last = performance.now();
   const frameTimes: number[] = [];
 
   function frame(now: number) {
-    const dt = Math.min((now - last) / 1000, 0.1);
+    const dt = FIXED_STEP ? STEP : Math.min((now - last) / 1000, 0.1);
     last = now;
     const tFrame = performance.now();
 
@@ -117,6 +121,7 @@ async function main() {
       scooter.drive(riding ? input : null, STEP);
       if (!riding) player.update(input, follow, STEP);
       physics.step();
+      simTime += STEP;
       acc -= STEP;
     }
     clock.advance(dt);
@@ -160,6 +165,7 @@ async function main() {
   // Hooks for automated tests (Playwright): fixed camera poses, time, stats.
   (window as unknown as { __game: unknown }).__game = {
     ready: true,
+    simTime: () => simTime,
     stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       busy: world.tiles.size, frameMs: frameTimes.reduce((a, b) => a + b, 0) / Math.max(frameTimes.length, 1) }),
     setView: (pos: number[], look: number[], hour?: number) => {
@@ -173,7 +179,12 @@ async function main() {
     terrain: (x: number, z: number) => world.terrainAt(x, z),
     player: () => player.position.toArray(),
     teleportPlayer: (x: number, y: number, z: number) => player.teleport(x, y, z),
-    scooter: () => ({ pos: scooter.position.toArray(), speed: scooter.speed, riding }),
+    scooter: () => {
+      const q = scooter.chassis.rotation();
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
+      const contacts = [0, 1, 2, 3].map((k) => scooter.vehicle.wheelIsInContact(k));
+      return { pos: scooter.position.toArray(), speed: scooter.speed, riding, up: up.toArray(), contacts };
+    },
   };
   requestAnimationFrame(frame);
 }
