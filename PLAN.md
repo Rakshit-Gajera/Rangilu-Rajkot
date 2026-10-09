@@ -1,21 +1,31 @@
 # Plan
 
-Current phase: **P0 — Data recon** (PROMPT.md §13). Gate: Rakshit reviews the 2D preview map.
+Current phase: **P1 — Vertical slice** (PROMPT.md §13). Gate: Rakshit recognises his streets; 60 fps on his laptop.
 
-## P0 tasks
-- [x] 0.1 Repo skeleton, docs, git remote, venv
-- [x] 0.2 Download raw data: OSM Western Zone (Geofabrik), Copernicus GLO-30 N22E070, Overture buildings
-- [x] 0.3 `rajkot_bake` package: config, CLI, stage framework (parquet in/out)
-- [x] 0.4 Stage 1–2: clip OSM with pyosmium → GeoParquet layers (UTM 42N, OSM ids kept)
-- [x] 0.5 Bounds (Darshan corridor pending pin): RMC boundary + 1.5 km ∪ lakes ∪ Darshan University corridor; horizon ring; origin at Trikon Baug; tile grid
-- [x] 0.6 Stage 3: building clean + conflate (Overture primary, OSM tags re-attached)
-- [x] 0.7 Stage 4: heights (OSM → Overture → heuristic; GHSL replaces Open Buildings)
-- [x] 0.8 Stage 5: use classification + draft zones.geojson
-- [x] 0.9 landmarks.yaml (20 + Darshan University), refs/SOURCES.md
-- [x] 0.10 Raw road stats + connectivity check
-- [x] 0.11 DATA_REPORT.md + 2D preview map (HTML)
-- [x] 0.12 pytest for geometry functions
-- [x] 0.13 Reviewer pass (geographer, performance) → fixes → gate
+P0 (data recon) is done. Leftover P0 items (landmark pins still needed: Dharmendra Rd, Lakhajiraj Rd,
+Sadar Bazaar, Connaught Hall, Ramvan, Trimandir) don't block P1.
 
-## Next phase
-P1 — vertical slice (~2×2 km: Race Course, Jubilee Garden, old-city bazaars).
+## Slice
+About 3 × 2 km around Race Course, Jubilee Garden and the old-city bazaars:
+x ∈ [−2000, +1000] m, y(north) ∈ [−500, +1500] m from the Trikon Baug origin = 24 tiles.
+
+## P1 tasks
+Bake (Python)
+- [ ] 1.1 Terrain: de-bumped Copernicus DEM → 10 m grid per tile, roads flattened, building base heights
+- [ ] 1.2 Roads: widths, surface polygons per tile (union handles junctions), centrelines with 3D profile, bridges/flyovers
+- [ ] 1.3 Parks/water/land-use polygons per tile
+- [ ] 1.4 Tiler + `.rtile` encoder (v1: HEIGHT, BLDG, ROAD, AREA sections) + manifest; slice packs
+
+Game (TypeScript, `game/`)
+- [ ] 1.5 Scaffold: Vite 8 + TS 7 + three r186 + Rapier 0.21, vitest, fixed-step loop
+- [ ] 1.6 Tile decode in a worker; generators: terrain, roads, buildings (extrude, roofs, parapets)
+- [ ] 1.7 Facade shader (windows/shutters/plaster by zone Z1–Z4, night windows)
+- [ ] 1.8 Sky, sun and moon (suncalc, IST), shadows, fog, day/night cycle
+- [ ] 1.9 Player on foot: Rapier character controller, third-person camera, colliders
+- [ ] 1.10 Scooter: ray-cast vehicle, lean, enter/exit, horn
+- [ ] 1.11 HUD: minimap, clock, speed, area name
+- [ ] 1.12 Playwright: boot + viewpoint screenshots + perf numbers
+- [ ] 1.13 Reviewer pass → fixes → gate
+
+## Done
+P0 — data recon (see PROGRESS.md and DATA_REPORT.md).
