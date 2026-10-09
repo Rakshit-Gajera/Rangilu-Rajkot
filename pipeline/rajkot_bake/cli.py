@@ -17,6 +17,7 @@ STAGES = {
     "heights": "heights",
     "classify": "classify",
     "landmarks": "landmarks",
+    "terrain": "terrain",
     "roads": "roads_raw",
     "report": "report",
 }
