@@ -46,6 +46,9 @@ export class Player {
   private vy = 0;
   private phase = 0;
   private heading = 0;
+  private jumpQueued = false;
+  private prev = new THREE.Vector3();
+  private cur = new THREE.Vector3();
   grounded = false;
   speed = 0;
   visible = true;
@@ -68,6 +71,20 @@ export class Player {
     c.setMinSlopeSlideAngle((50 * Math.PI) / 180);
     c.setApplyImpulsesToDynamicBodies(true);
     this.controller = c;
+    this.capture();
+    this.capture();
+  }
+
+  /** Remember the body position after a physics step (for render interpolation). */
+  capture() {
+    const t = this.body.translation();
+    this.prev.copy(this.cur);
+    this.cur.set(t.x, t.y - HALF_HEIGHT - RADIUS, t.z);
+  }
+
+  /** Latch a jump request from a key press; consumed by the next physics step. */
+  requestJump() {
+    this.jumpQueued = true;
   }
 
   get position(): THREE.Vector3 {
@@ -90,6 +107,8 @@ export class Player {
     this.body.setNextKinematicTranslation({ x, y: y + HALF_HEIGHT + RADIUS + 0.05, z });
     this.body.setTranslation({ x, y: y + HALF_HEIGHT + RADIUS + 0.05, z }, true);
     this.vy = 0;
+    this.capture();
+    this.capture();
   }
 
   update(input: Input, cam: FollowCamera, dt: number) {
@@ -106,10 +125,11 @@ export class Player {
 
     if (this.grounded) {
       this.vy = -1;
-      if (input.hit('Space')) this.vy = 4.6;
+      if (this.jumpQueued) this.vy = 4.6;
     } else {
       this.vy = Math.max(this.vy - 9.81 * dt, -40);
     }
+    this.jumpQueued = false;
     const desired = {
       x: Math.sin(this.heading) * this.speed * dt * (move.lengthSq() > 0 ? 1 : 0),
       y: this.vy * dt,
@@ -126,10 +146,12 @@ export class Player {
       const g = this.physics.groundAt(t.x, t.z);
       this.teleport(t.x, (g ?? 50) + 1, t.z);
     }
+  }
 
-    // Visual: face movement, swing limbs with speed.
-    const p = this.position;
-    this.object.position.copy(p);
+  /** Render-rate visuals: interpolated position, facing, limb swing. */
+  render(alpha: number, dt: number) {
+    if (!this.visible) return;
+    this.object.position.lerpVectors(this.prev, this.cur, alpha);
     this.object.rotation.y = THREE.MathUtils.lerp(this.object.rotation.y,
       this.object.rotation.y + angleDiff(this.object.rotation.y, this.heading), 1 - Math.exp(-dt * 12));
     this.phase += dt * (2 + this.speed * 2.2);

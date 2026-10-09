@@ -72,7 +72,7 @@ export class Hud {
     c.fill();
     c.stroke();
     // North marker on the rim.
-    const nx = W / 2 + Math.sin(-yaw) * (W / 2 - 12), ny = W / 2 - Math.cos(-yaw) * (W / 2 - 12);
+    const nx = W / 2 + Math.sin(yaw) * (W / 2 - 12), ny = W / 2 - Math.cos(yaw) * (W / 2 - 12);
     c.fillStyle = '#fff';
     c.font = 'bold 12px system-ui, sans-serif';
     c.textAlign = 'center';

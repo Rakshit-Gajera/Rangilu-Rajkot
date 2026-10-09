@@ -100,7 +100,8 @@ async function main() {
         const ox = Math.cos(yaw) * -1.0, oz = -Math.sin(yaw) * -1.0; // step off to the right side
         player.setVisible(true);
         scene.add(player.object);
-        player.teleport(p.x + ox, (physics.groundAt(p.x + ox, p.z + oz) ?? p.y) + 0.05, p.z + oz);
+        // Ray from just above the scooter, so stepping off never lands on a roof or flyover.
+        player.teleport(p.x + ox, (physics.groundAt(p.x + ox, p.z + oz, p.y + 2) ?? p.y) + 0.05, p.z + oz);
         audio.setEngine(null);
       } else if (near) {
         riding = true;
@@ -110,6 +111,7 @@ async function main() {
         follow.yaw = scooter.yaw() + Math.PI;
       }
     }
+    if (!riding && input.hit('Space')) player.requestJump();
     if (input.hit('KeyH')) audio.horn();
     if (input.hit('KeyT')) clock.hours = (clock.hours + 1) % 24;
     if (input.hit('KeyR') && riding) scooter.resetUpright();
@@ -121,19 +123,25 @@ async function main() {
       scooter.drive(riding ? input : null, STEP);
       if (!riding) player.update(input, follow, STEP);
       physics.step();
+      player.capture();
+      scooter.capture();
       simTime += STEP;
       acc -= STEP;
     }
     clock.advance(dt);
 
     // --- Visuals ----------------------------------------------------------------
-    scooter.sync(dt, worldUniforms.uNight.value);
+    const alpha = acc / STEP;
+    player.render(alpha, dt);
+    scooter.sync(dt, worldUniforms.uNight.value, alpha);
     const focus = riding ? scooter.focus : player.focus;
     if (fixedView) {
       camera.position.copy(fixedView.pos);
       camera.lookAt(fixedView.look);
     } else {
-      follow.update(input, focus, dt, riding ? { minDist: 4.5, fovBoost: Math.min(Math.abs(scooter.speed) * 0.5, 12) } : {});
+      follow.update(input, focus, dt, riding
+        ? { minDist: 4.5, fovBoost: Math.min(Math.abs(scooter.speed) * 0.5, 12), chaseYaw: scooter.yaw() + Math.PI }
+        : {});
     }
     env.update(clock, fixedView ? fixedView.look : focus, camera);
     world.flushUploads(4);
@@ -166,7 +174,7 @@ async function main() {
   (window as unknown as { __game: unknown }).__game = {
     ready: true,
     simTime: () => simTime,
-    stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+    stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, drawnTriangles: renderer.info.render.triangles,
       busy: world.tiles.size, frameMs: frameTimes.reduce((a, b) => a + b, 0) / Math.max(frameTimes.length, 1) }),
     setView: (pos: number[], look: number[], hour?: number) => {
       fixedView = { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look) };

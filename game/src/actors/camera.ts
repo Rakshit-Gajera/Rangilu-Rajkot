@@ -10,10 +10,19 @@ export class FollowCamera {
   firstPerson = false;
   private current = 4.5;
   private target = new THREE.Vector3();
+  private idle = 0;
 
   constructor(readonly camera: THREE.PerspectiveCamera, private physics: Physics) {}
 
-  update(input: Input, focus: THREE.Vector3, dt: number, opts: { minDist?: number; fovBoost?: number } = {}) {
+  update(input: Input, focus: THREE.Vector3, dt: number,
+    opts: { minDist?: number; fovBoost?: number; chaseYaw?: number } = {}) {
+    this.idle = input.mouseDX || input.mouseDY ? 0 : this.idle + dt;
+    // Chase camera: drift back behind the vehicle when the mouse is idle (PROMPT §9.3).
+    if (opts.chaseYaw !== undefined && this.idle > 0.8) {
+      let d = opts.chaseYaw - this.yaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.yaw += d * (1 - Math.exp(-dt * 2.5));
+    }
     this.yaw -= input.mouseDX * 0.0025;
     this.pitch = THREE.MathUtils.clamp(this.pitch - input.mouseDY * 0.0022, -1.2, 0.6);
     if (input.wheel) this.distance = THREE.MathUtils.clamp(this.distance + input.wheel * 0.8, opts.minDist ?? 2.5, 14);

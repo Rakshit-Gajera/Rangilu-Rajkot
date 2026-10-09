@@ -48,6 +48,10 @@ export class Scooter {
   private leanAngle = 0;
   private steer = 0;
   private wheelSpin = 0;
+  private prevPos = new THREE.Vector3();
+  private curPos = new THREE.Vector3();
+  private prevRot = new THREE.Quaternion();
+  private curRot = new THREE.Quaternion();
   occupied = false;
 
   constructor(physics: Physics, scene: THREE.Scene, x: number, y: number, z: number, heading: number, color = 0xb81d24) {
@@ -80,6 +84,17 @@ export class Scooter {
     this.light.position.set(0, 1.05, 0.6);
     this.light.target.position.set(0, 0, 12);
     this.mesh.lean.add(this.light, this.light.target);
+    this.capture();
+    this.capture();
+  }
+
+  /** Remember the chassis pose after a physics step (for render interpolation). */
+  capture() {
+    const t = this.chassis.translation(), q = this.chassis.rotation();
+    this.prevPos.copy(this.curPos);
+    this.prevRot.copy(this.curRot);
+    this.curPos.set(t.x, t.y, t.z);
+    this.curRot.set(q.x, q.y, q.z, q.w);
   }
 
   get position(): THREE.Vector3 {
@@ -147,14 +162,14 @@ export class Scooter {
   }
 
   /** Render-rate update: sync mesh, lean, wheels, headlight. */
-  sync(dt: number, night: number) {
-    const t = this.chassis.translation();
-    const q = this.chassis.rotation();
-    this.mesh.root.position.set(t.x, t.y - 0.42, t.z);
-    this.mesh.root.quaternion.set(q.x, q.y, q.z, q.w);
+  sync(dt: number, night: number, alpha = 1) {
+    this.mesh.root.position.lerpVectors(this.prevPos, this.curPos, alpha);
+    this.mesh.root.position.y -= 0.42;
+    this.mesh.root.quaternion.slerpQuaternions(this.prevRot, this.curRot, alpha);
     const speed = this.speed;
-    // Lean into turns like a two-wheeler: proportional to lateral acceleration v^2 * curvature.
-    const targetLean = THREE.MathUtils.clamp(-this.steer * speed * speed * 0.035, -0.6, 0.6);
+    // Lean into turns like a two-wheeler: tan(lean) = lateral acceleration / g = v * yaw rate / g.
+    const yawRate = this.chassis.angvel().y;
+    const targetLean = THREE.MathUtils.clamp(-Math.atan((speed * yawRate) / 9.81), -0.6, 0.6);
     this.leanAngle = THREE.MathUtils.lerp(this.leanAngle, targetLean, 1 - Math.exp(-dt * 6));
     this.mesh.lean.rotation.z = this.leanAngle;
     this.mesh.handle.rotation.y = this.steer;
