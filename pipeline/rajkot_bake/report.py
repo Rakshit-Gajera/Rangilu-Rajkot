@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from datetime import date
 
+import duckdb
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -112,13 +113,23 @@ def _table(d: dict, h1: str, h2: str) -> str:
     return f"| {h1} | {h2} |\n|---|---|\n{rows}\n"
 
 
-def run(cfg: C.Config, include_private: bool = True) -> None:
-    b = gpd.read_parquet(C.interim("buildings.parquet"))
+def run(cfg: C.Config, include_private: bool = False) -> None:
+    b = gpd.read_parquet(C.interim("buildings_c.parquet"))
     meta = C.read_json(C.interim("bounds.json"))
     rs = C.read_json(C.interim("roads_stats.json"))
     lm = gpd.read_parquet(C.interim("landmarks.parquet"))
     osm_b = gpd.read_parquet(C.interim("osm_buildings.parquet"))
     n = len(b)
+    pt = gpd.read_parquet(C.interim("osm_pois.parquet")).tags.map(json.loads)
+    keys = ("amenity", "shop", "tourism", "leisure", "historic", "railway", "office")
+    pois_by_cat = pt.map(lambda t: next((("shop=*" if k == "shop" else f"{k}={t[k]}") for k in keys if k in t),
+                                        "other")).value_counts().head(20).to_dict()
+    con = duckdb.connect()
+    con.sql("INSTALL spatial; LOAD spatial;")
+    places = (C.RAW / cfg["fetch"]["sources"]["overture_places"]["file"]).as_posix()
+    bld = (C.RAW / cfg["fetch"]["sources"]["overture_buildings"]["file"]).as_posix()
+    n_places = con.sql(f"select count(*) from read_parquet('{places}') where confidence >= 0.5").fetchone()[0]
+    n_overture = con.sql(f"select count(*) from read_parquet('{bld}')").fetchone()[0]
 
     # QA checks (PROMPT §7.15).
     invalid = int((~shapely.is_valid(b.geometry.values)).sum())
@@ -128,22 +139,35 @@ def run(cfg: C.Config, include_private: bool = True) -> None:
     ov_area = shapely.area(shapely.intersection(b.geometry.values[i[pairs]], b.geometry.values[j[pairs]]))
     overlapping = len(set(i[pairs][ov_area > 1.0]) | set(j[pairs][ov_area > 1.0]))
     overlap_share = overlapping / n
-    missing_lm = lm.loc[lm.status == "missing", "id"].tolist()
+    missing_lm = lm.loc[lm.status.isin(["missing", "ambiguous"]), "id"].tolist()
+    outside_lm = lm.loc[(lm.status != "missing") & ~lm.in_playable, "id"].tolist()
+    # (key, label, ok, detail); ok None = not applicable yet.
     checks = [
-        ("No invalid geometry", invalid == 0, f"{invalid} invalid"),
-        ("Overlapping buildings < 0.5 %", overlap_share < 0.005, f"{overlap_share:.2%} ({overlapping}) overlap > 1 m²"),
-        ("Largest road component ≥ 98 % of drivable length", rs["largest_component_share"] >= 0.98,
-         f"{rs['largest_component_share']:.1%}"),
-        ("Every tile ≤ 1 MB", None, "n/a until tiles are encoded (P1/P2)"),
-        ("Every landmark located", not missing_lm, f"missing: {', '.join(missing_lm) or 'none'}"),
+        ("valid_geometry", "No invalid geometry", invalid == 0, f"{invalid} invalid"),
+        ("overlap", "Overlapping buildings < 0.5 %", overlap_share < 0.005,
+         f"{overlap_share:.2%} ({overlapping}) overlap > 1 m²"),
+        ("road_connectivity", "Largest road component ≥ 98 % of drivable length",
+         rs["largest_component_share"] >= 0.98, f"{rs['largest_component_share']:.1%}"),
+        ("tile_size", "Every tile ≤ 1 MB", None, "n/a until tiles are encoded (P1/P2)"),
+        ("landmarks_located", "Every landmark located (unambiguous, inside the playable area)",
+         not missing_lm and not outside_lm,
+         f"missing/ambiguous: {', '.join(missing_lm) or 'none'}; outside playable: {', '.join(outside_lm) or 'none'}"),
     ]
+    waivers = (cfg.raw.get("qa") or {}).get("waivers") or {}
+
+    def verdict(key: str, ok: bool | None) -> str:
+        if ok is None:
+            return "—"
+        if ok:
+            return "PASS"
+        return f"WAIVED ({waivers[key]})" if key in waivers else "**FAIL**"
 
     hs = b.height_source.value_counts()
     lv = b.levels.value_counts().sort_index()
     md = [f"# Data report — Rajkot bake\n\nGenerated {date.today().isoformat()} by `python -m rajkot_bake report`. "
           "Phase 0 (data recon).\n",
           "## QA checks\n", "| Check | Result | Detail |\n|---|---|---|",
-          *[f"| {c} | {'PASS' if ok else ('—' if ok is None else '**FAIL**')} | {d} |" for c, ok, d in checks], "",
+          *[f"| {c} | {verdict(k, ok)} | {d} |" for k, c, ok, d in checks], "",
           "## World frame\n",
           f"- Projection {meta['crs']}; origin {meta['origin']['lonlat']} ({meta['origin']['source']}), "
           f"E {meta['origin']['easting']} N {meta['origin']['northing']}.",
@@ -152,7 +176,8 @@ def run(cfg: C.Config, include_private: bool = True) -> None:
           f"- Tiles: {meta['tiles_active']} active of a {meta['tile_grid']['ni']} × {meta['tile_grid']['nj']} grid (500 m).",
           f"- Lakes matched: {', '.join(meta['lakes_found'])}.", "",
           "## Buildings\n",
-          f"- Final buildings: **{n:,}** (OSM outlines in the area: {len(osm_b):,}).",
+          f"- Final buildings: **{n:,}** in the playable area (raw bbox: {n_overture:,} Overture buildings, "
+          f"{len(osm_b):,} OSM building outlines).",
           _table(b.src.value_counts().rename({"osm": "OpenStreetMap", "ms": "Microsoft ML", "gob": "Google Open Buildings"}).to_dict(),
                  "Outline source", "Buildings"),
           _table({k: f"{v:,} ({v / n:.1%})" for k, v in hs.items()}, "Height source", "Buildings"),
@@ -169,8 +194,12 @@ def run(cfg: C.Config, include_private: bool = True) -> None:
           _table(rs["km_by_width_rule"], "Width rule", "km"),
           f"- Roads whose name gives the width: {', '.join(rs['named_feet_roads']) or 'none'}.",
           f"- Bridges/flyovers: {rs['bridges_km']} km.", "",
-          "## Landmarks\n", "| Landmark | Confidence | Status | Note |\n|---|---|---|---|",
-          *[f"| {r['name']} | {r.confidence} | {r.status} | {r.note} |" for _, r in lm.iterrows()], "",
+          "## Landmarks\n", "| Landmark | Confidence | Status | In playable area | Note |\n|---|---|---|---|---|",
+          *[f"| {r['name']} | {r.confidence} | {r.status} | {'yes' if r.in_playable else 'no'} | {r.note} |"
+            for _, r in lm.iterrows()], "",
+          "## POIs\n",
+          _table(pois_by_cat, "OSM POI category (top 20)", "Count"),
+          f"- Overture places with confidence ≥ 0.5 (used for shop/use hints): {n_places:,}.", "",
           "## Known data gaps\n",
           "- OSM has no RMC boundary for Rajkot; the playable area is derived (see DECISIONS.md).",
           "- Overture/OSM carry almost no building heights; ~92 % of heights come from GHSL 100 m cell averages "
@@ -178,5 +207,8 @@ def run(cfg: C.Config, include_private: bool = True) -> None:
           "- Many old-city streets (Dharmendra Rd, Lakhajiraj Rd, Sadar Bazaar) are unnamed in OSM.",
           "- Overture places are POI points of mixed quality (e.g. Darshan University is mis-geocoded).", ""]
     (C.ROOT / "DATA_REPORT.md").write_text("\n".join(md), encoding="utf-8")
-    print(f"  DATA_REPORT.md written; checks: " + ", ".join(f"{c.split()[0]}={'ok' if ok else ('n/a' if ok is None else 'FAIL')}" for c, ok, _ in checks))
     _preview(cfg, b, meta, include_private)
+    print("  checks: " + ", ".join(f"{k}={verdict(k, ok).split()[0]}" for k, _, ok, _ in checks))
+    failed = [k for k, _, ok, _ in checks if ok is False and k not in waivers]
+    if failed:
+        raise SystemExit(f"QA failed: {', '.join(failed)} (see DATA_REPORT.md)")

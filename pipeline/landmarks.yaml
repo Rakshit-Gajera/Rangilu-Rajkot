@@ -131,6 +131,7 @@ landmarks:
     name: Trimandir
     refs: [{overture: [70.90567, 22.34269], what: Trimandir (Microsoft)}, {overture: [70.80537, 22.30477], what: Trimandir (meta)}]
     confidence: low
+    ambiguous: true
     note: Two candidate points 10 km apart. Needs Rakshit.
   - id: darshan_university
     name: Darshan University (Hadala, Rajkot-Morbi Highway)

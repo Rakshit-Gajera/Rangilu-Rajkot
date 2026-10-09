@@ -26,7 +26,7 @@ def test_road_width(tags, expected, rule):
 def test_seed_is_stable():
     assert geom.seed_of("w123") == geom.seed_of("w123")
     assert geom.seed_of("w123") != geom.seed_of("w124")
-    assert 0 <= geom.seed_of("x") < 2**32
+    assert 0 <= geom.seed_of("x") < 2**64
 
 
 def test_height_formula_bounds():

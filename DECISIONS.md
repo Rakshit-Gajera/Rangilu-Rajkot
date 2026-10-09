@@ -24,7 +24,8 @@ Format: date · decision · why · alternatives considered.
 - **Why:** as suggested in PROMPT.md §4.3; ODbL is mandatory for an OSM/Overture derivative database.
 
 ## 2026-10-09 · City extent derived from data (no RMC boundary in OSM)
-- **Decision:** city core = OSM Rajkot East/West/South urban talukas ∪ OSM place=city polygon ∪ Overture built-up blobs (200 m cells with ≥ 8 % footprint cover) that touch it; playable = core + 1.5 km ∪ four lakes (+200 m). Result: 333 km², 26.9 × 21 km, 1,447 tiles.
+- **Decision:** city core = OSM Rajkot East/West/South urban talukas ∪ OSM place=city polygon ∪ Overture built-up area (200 m cells with ≥ 8 % footprint cover) within 10 km of the origin that touches it; playable = core + 1.5 km ∪ four lakes (+200 m). Result: 290 km², 21.0 × 19.8 km, 1,259 tiles.
+- **Revised after review:** the first version (no radius cap) followed ribbon development along Kalawad Road out to Metoda GIDC, 17 km west.
 - **Why:** neither OSM nor Overture has an RMC polygon for Rajkot; rule 4 forbids drawing one by hand. Overture division areas also failed to download (S3 network errors).
 - **Alternatives:** hand-drawn boundary (rejected, rule 4); bbox (too much empty farmland). Rakshit reviews at the P0 gate.
 
@@ -45,3 +46,15 @@ Format: date · decision · why · alternatives considered.
 
 ## 2026-10-09 · Landmark positions from Overture places when OSM lacks them
 - **Why:** OSM Rajkot is sparse (no Trikon Baug, Rajkumar College, Lalpari...). Overture POI points are used as **medium** confidence; mis-geocoded points (e.g. Darshan University) are rejected and logged in refs/SOURCES.md.
+
+## 2026-10-09 · P0 review fixes
+- **Lakes are pinned by OSM id** in config.yaml (nearest-polygon snapping picked a 2.4 ha pond for Lalpari). Aji-1 is mapped twice in OSM (w132973447, r1786289); water polygons must be de-duplicated before meshing.
+- **Old-city Z1 override** from sourced points (Soni Bazar, Darbar Gadh Museum, Kaba Gandhi no Delo, a Dharmendra Rd shop address) + 250 m; low confidence, for Rakshit to redraw. The rule was relaxed to ≥ 30 % shared walls, median footprint < 120 m², < 2 km from the origin.
+- **Zone overrides apply by building centroid**, with tighter buffers (20–40 m).
+- **Frontage uses the nearest road segment's direction**, not the whole way's end-to-end direction.
+- **Shops need a retail POI category** (allowlist), not any POI.
+- **Each building stage writes its own file** (`buildings` → `buildings_h` → `buildings_c`) so stages re-run independently.
+- **Tile (i, j) are relative to the origin**, so ids stay stable when the playable area grows.
+- **Seeds are 64-bit** (blake2b-8); outlines are wound counter-clockwise.
+- **QA failures exit non-zero** unless waived in `config.yaml → qa.waivers`. P0 waiver: `landmarks_located` (six landmarks need Rakshit's input; Trimandir is ambiguous).
+- **The preview map excludes private places** unless `report --private` is passed.

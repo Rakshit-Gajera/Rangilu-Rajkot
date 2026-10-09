@@ -7,6 +7,7 @@ All rules here are first guesses for Rakshit to correct on the preview map.
 from __future__ import annotations
 
 import json
+import re
 
 import duckdb
 import geopandas as gpd
@@ -22,6 +23,11 @@ ZONE_NAMES = {1: "Z1 Old city", 2: "Z2 Heritage", 3: "Z3 Societies", 4: "Z4 Comm
 CORRIDORS = r"(?i)kalawad|yagnik|university road|150\s*(?:ft|feet|foot)|gondal road|raiya road|dhebar|" \
             r"jamnagar road|kuvadva|kuvadava|morbi road|amin marg|tagore|limda chowk"
 PALETTES_PER_ZONE = 8
+# POI categories that mean a street-facing shop (OSM amenity/shop, Overture basic_category).
+SHOP_RE = re.compile(r"(?i)shop|store|retail|market|restaurant|eatery|cafe|fast_food|food|bakery|sweet|"
+                     r"dessert|ice_cream|juice|tea|bar$|pharmacy|chemist|jewel|bank|atm|salon|beauty|"
+                     r"barber|optic|mobile|electronics|apparel|fashion|tailor|hardware|grocery|"
+                     r"supermarket|convenience|stationery|book|gift|florist|dentist|doctor|diagnostic")
 
 OSM_USE = {
     "house": "residential", "residential": "residential", "apartments": "residential", "detached": "residential",
@@ -77,7 +83,7 @@ def _cell_stats(g: gpd.GeoDataFrame, cell: float) -> pd.DataFrame:
 
 def run(cfg: C.Config) -> None:
     hc = cfg["heights"]
-    g = gpd.read_parquet(C.interim("buildings.parquet"))
+    g = gpd.read_parquet(C.interim("buildings_h.parquet"))
     meta = C.read_json(C.interim("bounds.json"))
     oe, on = meta["origin"]["easting"], meta["origin"]["northing"]
     tags = g.tags.map(json.loads)
@@ -113,7 +119,7 @@ def run(cfg: C.Config) -> None:
             worship[b] = WORSHIP_TYPE.get(rel) or WORSHIP_TYPE.get(cat, "hindu_temple")
         if u and use[b] in ("", "residential", "commercial", "mixed"):
             use[b] = u
-        elif not u and cat not in ("other", None):
+        elif not u and cat and SHOP_RE.search(cat):
             has_shop[b] = True
     for k in np.flatnonzero(use == "religious"):
         if worship[k] is None:
@@ -141,11 +147,13 @@ def run(cfg: C.Config) -> None:
     zone[near_cor & (zone != 7)] = 4
     zone[(g.levels.values >= 6) | ((cs.med_lv.values >= 5) & (g.levels.values >= 4))] = 5
     zone[in_ind | ((g.area.values > 1500) & (g.levels.values <= 2) & (use != "educational"))] = 6
-    zone[(cs.touch.values >= 0.5) & (cs.med_area.values < 150) & (dist_origin < 2000)] = 1
+    zone[(cs.touch.values >= 0.3) & (cs.med_area.values < 120) & (dist_origin < 2000)] = 1
 
+    # Hand overrides apply to buildings whose centroid lies inside the polygon.
     ov = gpd.read_file(C.PIPELINE_DIR / "zones.geojson").to_crs(cfg.crs)
+    cent_tree = STRtree(shapely.centroid(geoms))
     for _, z in ov.iterrows():
-        zone[tree.query(z.geometry, predicate="intersects")] = int(z.zone)
+        zone[cent_tree.query(z.geometry, predicate="contains")] = int(z.zone)
 
     # Remaining use defaults by zone.
     rest = use == ""
@@ -171,7 +179,7 @@ def run(cfg: C.Config) -> None:
     g["zone"] = zone
     g["shop_ground_floor"] = shop_gf
     g["palette_id"] = (g.seed.values % PALETTES_PER_ZONE).astype("uint8")
-    g.to_parquet(C.interim("buildings.parquet"))
+    g.to_parquet(C.interim("buildings_c.parquet"))
     print("  use:", pd.Series(use).value_counts().to_dict())
     print("  zone:", {ZONE_NAMES[k]: int(v) for k, v in sorted(pd.Series(zone).value_counts().items())})
     print(f"  shop ground floor: {int(shop_gf.sum())}; worship: {pd.Series(worship).value_counts().to_dict()}")

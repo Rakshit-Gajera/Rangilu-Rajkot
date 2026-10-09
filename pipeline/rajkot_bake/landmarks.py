@@ -45,7 +45,9 @@ def run(cfg: C.Config) -> None:
                 hit = r[r.name.fillna("").str.contains(ref["osm_road_name"], flags=re.I)]
                 if len(hit):
                     geoms.append(shapely.union_all(hit.geometry.values))
-        if geoms:
+        if geoms and lm.get("ambiguous"):
+            g, status = shapely.union_all(geoms), "ambiguous"
+        elif geoms:
             g = shapely.union_all(geoms)
             status = "located" if lm["confidence"] == "high" else "approx"
         else:
@@ -55,7 +57,7 @@ def run(cfg: C.Config) -> None:
                      "note": lm.get("note", ""), "geometry": g})
     out = gpd.GeoDataFrame(rows, geometry="geometry", crs=cfg.crs)
     out.to_parquet(C.interim("landmarks.parquet"))
-    for s in ("located", "approx", "missing"):
+    for s in ("located", "approx", "ambiguous", "missing"):
         ids = out.loc[out.status == s, "id"].tolist()
         print(f"  {s:8s} {len(ids):2d}: {', '.join(ids)}")
     outside = out.loc[(out.status != "missing") & ~out.in_playable, "id"].tolist()

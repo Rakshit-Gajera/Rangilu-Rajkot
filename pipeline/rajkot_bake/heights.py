@@ -33,19 +33,21 @@ def _num(v: str | None) -> float | None:
         return None
 
 
-def _ghsl(cfg: C.Config, pts: np.ndarray) -> np.ndarray:
+def _ghsl(cfg: C.Config, pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """GHSL height at each point and the id of the raster cell it falls in."""
     tif = next((C.RAW / "ghsl").glob("GHS_BUILT_H_ANBH*.tif"))
     lon, lat = Transformer.from_crs(cfg.crs, "EPSG:4326", always_xy=True).transform(pts[:, 0], pts[:, 1])
     with rasterio.open(tif) as r:
         vals = np.array([v[0] for v in r.sample(zip(lon, lat))], dtype=float)
+        rows, cols = rasterio.transform.rowcol(r.transform, lon, lat)
     vals[~np.isfinite(vals)] = 0
-    return vals
+    return vals, (np.asarray(rows, np.int64) << 20) + np.asarray(cols, np.int64)
 
 
 def run(cfg: C.Config) -> None:
     hc = cfg["heights"]
     floor = hc["floor_height"]
-    g = gpd.read_parquet(C.interim("buildings.parquet"))
+    g = gpd.read_parquet(C.interim("buildings.parquet"))  # stage 3 output
     tags = g.tags.map(json.loads)
 
     n = len(g)
@@ -70,9 +72,8 @@ def run(cfg: C.Config) -> None:
     # GHSL: cell-average height, distributed by footprint size within the cell.
     cent = np.column_stack([shapely.get_x(shapely.centroid(g.geometry.values)),
                             shapely.get_y(shapely.centroid(g.geometry.values))])
-    gh = _ghsl(cfg, cent)
+    gh, cell = _ghsl(cfg, cent)
     g["ghsl_h"] = gh.round(1)
-    cell = (np.floor(cent[:, 0] / 90).astype(np.int64) << 20) + np.floor(cent[:, 1] / 90).astype(np.int64)
     area = g.area.values
     order = np.argsort(cell)
     _, first, counts = np.unique(cell[order], return_index=True, return_counts=True)
@@ -97,7 +98,7 @@ def run(cfg: C.Config) -> None:
     g["height_source"] = source
     approx_h = 3.1 + (levels - 1) * floor + 1.0
     g["review_height"] = approx_h > hc["review_above"]
-    g.to_parquet(C.interim("buildings.parquet"))
+    g.to_parquet(C.interim("buildings_h.parquet"))
     vc = g.height_source.value_counts()
     print("  height sources:", {k: f"{v} ({v / n:.1%})" for k, v in vc.items()})
     print("  levels distribution:", np.bincount(levels)[1:].tolist())

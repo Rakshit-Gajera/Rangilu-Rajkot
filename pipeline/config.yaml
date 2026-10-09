@@ -36,13 +36,16 @@ world:
   builtup:
     cell: 200.0             # grid cell size
     min_cover: 0.08         # building footprint share that counts as built-up
+    closing: 2              # morphological closing iterations (cells)
+    max_distance: 10000.0   # built-up area counts only within this radius of the origin
   rmc_buffer: 1500.0        # playable = city core + this buffer
-  # Lake reference points (Overture places, meta); snapped to the nearest OSM water polygon.
+  # Lakes pinned to OSM water polygons; the point is the Overture place that identified it
+  # (refs/SOURCES.md). Aji-1 is mapped twice in OSM (w132973447 and r1786289).
   lakes:
-    Aji-1: [70.83608, 22.27047]
-    Nyari-1: [70.70801, 22.24772]
-    Lalpari: [70.83456, 22.31345]
-    Randarda: [70.84485, 22.29339]
+    Aji-1: {osm: w132973447, point: [70.83608, 22.27047]}
+    Nyari-1: {osm: r1917301, point: [70.70801, 22.24772]}
+    Lalpari: {osm: r1786283, point: [70.83456, 22.31345]}
+    Randarda: {osm: r1786286, point: [70.84485, 22.29339]}
   lake_buffer: 200.0
   # Extra playable areas beyond the city (PROMPT §0.1 item 5).
   extras:
@@ -68,3 +71,8 @@ heights:
   parapet: [0.9, 1.1]
   clamp: [3.0, 100.0]
   review_above: 60.0
+
+qa:
+  # Checks allowed to fail without failing the bake, with the reason (DECISIONS.md).
+  waivers:
+    landmarks_located: "P0: six landmarks need positions from Rakshit"

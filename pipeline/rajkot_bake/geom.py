@@ -23,8 +23,8 @@ CARRIAGEWAY_SHARE = 0.70  # of right-of-way, for roads named "N Feet Road"
 
 
 def seed_of(key: str) -> int:
-    """Stable 32-bit seed for an object id (same on every run and platform)."""
-    return int.from_bytes(hashlib.blake2b(key.encode(), digest_size=4).digest(), "little")
+    """Stable 64-bit seed for an object id (same on every run and platform)."""
+    return int.from_bytes(hashlib.blake2b(key.encode(), digest_size=8).digest(), "little")
 
 
 def _parse_metres(v: str | None) -> float | None:

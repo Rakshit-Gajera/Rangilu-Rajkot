@@ -54,7 +54,9 @@ def run(cfg: C.Config, force: bool = False) -> None:
             print(f"  downloading Overture {src[key]['type']}")
             subprocess.run([str(exe), "download", f"--bbox={bbox}", "-f", "geoparquet",
                             f"--type={src[key]['type']}", "-o", str(dest)], check=True)
-        manifest[key] = {"file": src[key]["file"], "bbox": list(cfg.bbox)}
+        state = dest.with_name(dest.name + ".state")
+        release = C.read_json(state).get("last_release") if state.exists() else None
+        manifest[key] = {"file": src[key]["file"], "bbox": list(cfg.bbox), "release": release}
 
     for entry in manifest.values():
         p = C.RAW / entry["file"]

@@ -143,6 +143,9 @@ def extract(cfg: C.Config) -> None:
 
 
 def run(cfg: C.Config) -> None:
-    if not (C.RAW / "osm" / CLIPPED).exists():
+    stamp = C.RAW / "osm" / (CLIPPED + ".json")
+    want = {"bbox": list(cfg.bbox), "source": cfg["fetch"]["sources"]["osm"]["file"]}
+    if not (C.RAW / "osm" / CLIPPED).exists() or not stamp.exists() or C.read_json(stamp) != want:
         clip(cfg)
+        C.write_json(stamp, want)
     extract(cfg)

@@ -21,7 +21,7 @@ from shapely.geometry import Point, box
 from . import config as C
 
 
-def _builtup(cfg: C.Config, cell: float, min_cover: float) -> shapely.Geometry:
+def _builtup(cfg: C.Config, cell: float, min_cover: float, closing: int) -> shapely.Geometry:
     """Union of grid cells whose building footprint coverage is >= min_cover."""
     con = duckdb.connect()
     con.sql("INSTALL spatial; LOAD spatial;")
@@ -37,7 +37,7 @@ def _builtup(cfg: C.Config, cell: float, min_cover: float) -> shapely.Geometry:
     grid = np.zeros((ny, nx))
     np.add.at(grid, (((y - y0) // cell).astype(int), ((x - x0) // cell).astype(int)), a)
     mask = grid / (cell * cell) >= min_cover
-    mask = ndimage.binary_closing(mask, iterations=3)
+    mask = ndimage.binary_closing(mask, iterations=closing)
     mask = ndimage.binary_fill_holes(mask)
     labels, n = ndimage.label(mask)
     cells = [box(x0 + i * cell, y0 + j * cell, x0 + (i + 1) * cell, y0 + (j + 1) * cell)
@@ -63,23 +63,25 @@ def run(cfg: C.Config) -> None:
     print(f"  urban talukas found: {sorted(talukas.name)}; city polygons: {len(city)}")
     core = shapely.union_all([*talukas.geometry, *city.geometry])
 
-    built = _builtup(cfg, w["builtup"]["cell"], w["builtup"]["min_cover"])
-    # Keep built-up blobs that touch the core (drops distant villages / GIDCs).
+    bu = w["builtup"]
+    built = _builtup(cfg, bu["cell"], bu["min_cover"], bu["closing"])
+    # Keep built-up blobs that touch the core, clipped to a radius around the origin
+    # (ribbon development along highways would otherwise pull in distant GIDCs).
+    built = built.intersection(origin.buffer(bu["max_distance"]))
     parts = [p for p in getattr(built, "geoms", [built]) if p.intersects(core.buffer(500))]
     core = shapely.union_all([core, *parts])
 
     playable = core.buffer(w["rmc_buffer"])
 
-    # Lakes: OSM water polygons nearest each sourced lake point.
+    # Lakes: OSM water polygons pinned by id in config.yaml.
     water = gpd.read_parquet(C.interim("osm_water_areas.parquet"))
     lakes = []
-    for name, (llon, llat) in w["lakes"].items():
-        p = Point(*to_utm.transform(llon, llat))
-        d = water.distance(p)
-        if d.min() < 500:
-            lakes.append((name, water.loc[d.idxmin()]))
+    for name, lk in w["lakes"].items():
+        hit = water[(water.osm_type == lk["osm"][0]) & (water.osm_id == int(lk["osm"][1:]))]
+        if len(hit):
+            lakes.append((name, hit.iloc[0]))
         else:
-            print(f"  WARNING lake {name}: no OSM water polygon within 500 m")
+            print(f"  WARNING lake {name}: OSM {lk['osm']} not found")
     for name, row in lakes:
         playable = playable.union(row.geometry.buffer(w["lake_buffer"]))
 
@@ -100,7 +102,8 @@ def run(cfg: C.Config) -> None:
     playable = shapely.simplify(shapely.make_valid(playable), 10)
     horizon = playable.buffer(w["horizon_ring"]).difference(playable)
 
-    # Tile grid aligned to the origin, covering the playable area.
+    # Tile grid aligned to the origin; (i, j) are relative to the origin so ids
+    # stay stable when the playable area grows.
     ts = w["tile_size"]
     minx, miny, maxx, maxy = playable.bounds
     i0, j0 = math.floor((minx - oe) / ts), math.floor((miny - on) / ts)
@@ -110,7 +113,7 @@ def run(cfg: C.Config) -> None:
         for i in range(i0, i1):
             t = box(oe + i * ts, on + j * ts, oe + (i + 1) * ts, on + (j + 1) * ts)
             if t.intersects(playable):
-                tiles.append({"i": i - i0, "j": j - j0, "geometry": t})
+                tiles.append({"i": i, "j": j, "geometry": t})
 
     gpd.GeoDataFrame([{"kind": "playable", "geometry": playable}, {"kind": "horizon", "geometry": horizon},
                       {"kind": "core", "geometry": core}], crs=cfg.crs).to_parquet(C.interim("bounds.parquet"))

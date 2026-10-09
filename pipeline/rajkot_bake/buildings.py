@@ -129,9 +129,11 @@ def _resolve_overlaps(g: gpd.GeoDataFrame, min_area: float) -> gpd.GeoDataFrame:
     i, j = STRtree(geoms).query(geoms, predicate="intersects")
     keep = i < j
     i, j = i[keep], j[keep]
+    # Process larger overlaps first so the result doesn't depend on index order.
+    order = np.argsort(-shapely.area(shapely.intersection(geoms[i], geoms[j])), kind="stable")
+    i, j = i[order], j[order]
     drop = np.zeros(len(g), bool)
     clipped = 0
-    # Process larger overlaps first so later clips see updated geometry.
     for a, b in zip(i, j):
         if drop[a] or drop[b]:
             continue
@@ -196,14 +198,21 @@ def _metrics(g: gpd.GeoDataFrame, roads: gpd.GeoDataFrame, front_d: float) -> gp
     rtags = roads.tags.map(json.loads)
     roads = roads[rtags.map(lambda t: t.get("highway") in DRIVABLE)].copy()
     rt = roads.tags.map(json.loads)
-    roads["half_w"] = [geom.road_width(t)[0] / 2 for t in rt]
-    road_poly = shapely.buffer(roads.geometry.values, roads.half_w.values, cap_style="flat")
-    road_dir = []
-    for line in roads.geometry.values:
-        c = np.asarray(line.coords)
-        d = c[-1] - c[0]
-        road_dir.append(np.degrees(np.arctan2(d[1], d[0])) % 180)
-    road_dir = np.asarray(road_dir)
+    half_w = np.array([geom.road_width(t)[0] / 2 for t in rt])
+    # Split roads into straight segments so each carries its own direction.
+    seg_lines, seg_hw = [], []
+    for line, hw in zip(roads.geometry.values, half_w):
+        for part in getattr(line, "geoms", [line]):
+            c = np.asarray(part.coords)
+            seg_lines.append(c)
+            seg_hw.append(np.full(len(c) - 1, hw))
+    a = np.vstack([c[:-1] for c in seg_lines])
+    b = np.vstack([c[1:] for c in seg_lines])
+    seg_hw = np.concatenate(seg_hw)
+    ok = np.hypot(*(b - a).T) > 0.01
+    a, b, seg_hw = a[ok], b[ok], seg_hw[ok]
+    road_dir = np.degrees(np.arctan2(b[:, 1] - a[:, 1], b[:, 0] - a[:, 0])) % 180
+    road_poly = shapely.buffer(shapely.linestrings(np.stack([a, b], axis=1)), seg_hw, cap_style="flat")
     road_tree = STRtree(road_poly)
 
     # Explode exterior edges.
@@ -274,6 +283,8 @@ def run(cfg: C.Config) -> None:
     g = _resolve_overlaps(g, bc["min_area"])
     g = _square_and_simplify(g, bc["simplify_tolerance"], bc["square_angle_tolerance"])
     g = g[shapely.is_valid(g.geometry.values) & (g.area > 0)].reset_index(drop=True)
+    # Consistent winding: exterior counter-clockwise (interiors clockwise).
+    g["geometry"] = shapely.orient_polygons(g.geometry.values, exterior_cw=False)
 
     tags = g.tags.map(lambda t: json.loads(t) if isinstance(t, str) else {})
     btype = tags.map(lambda t: t.get("building", ""))
@@ -281,7 +292,7 @@ def run(cfg: C.Config) -> None:
                                                             "college", "school", "hospital"])
     roads = gpd.read_parquet(C.interim("osm_roads.parquet"))
     g = _metrics(g, roads, bc["frontage_distance"])
-    g["seed"] = g.bid.map(geom.seed_of).astype("uint32")
+    g["seed"] = g.bid.map(geom.seed_of).astype("uint64")
     g["tags"] = g.tags.fillna("{}")
     cols = ["bid", "src", "osm_type", "osm_id", "overture_id", "tags", "ov_height", "ov_floors", "ov_subtype",
             "ov_class", "ov_roof", "ov_name", "area", "perimeter", "compactness", "orientation", "edge_kinds",

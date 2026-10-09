@@ -15,7 +15,7 @@ Current phase: **P0 — Data recon** (PROMPT.md §13). Gate: Rakshit reviews the
 - [x] 0.10 Raw road stats + connectivity check
 - [x] 0.11 DATA_REPORT.md + 2D preview map (HTML)
 - [x] 0.12 pytest for geometry functions
-- [ ] 0.13 Reviewer pass (geographer, performance) → fixes → gate
+- [x] 0.13 Reviewer pass (geographer, performance) → fixes → gate
 
 ## Next phase
 P1 — vertical slice (~2×2 km: Race Course, Jubilee Garden, old-city bazaars).
