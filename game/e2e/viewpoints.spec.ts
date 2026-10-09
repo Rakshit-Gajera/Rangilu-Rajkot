@@ -4,11 +4,15 @@ import { expect, test, type Page } from '@playwright/test';
 
 /** Fixed camera poses for visual review (PROMPT §12). x east, n north from Trikon Baug; heights above ground. */
 const VIEWS: { name: string; cam: [number, number, number]; look: [number, number, number]; hour: number }[] = [
-  { name: '01-race-course-sunset', cam: [-1030, 6, 440], look: [-1130, 2, 520], hour: 18.4 },
-  { name: '02-jubilee-watson', cam: [70, 4, 545], look: [0, 6, 595], hour: 10 },
-  { name: '05-trikon-baug', cam: [60, 14, -60], look: [0, 2, 0], hour: 11 },
-  { name: '04-soni-bazaar', cam: [600, 2.2, 225], look: [650, 4, 275], hour: 11 },
-  { name: '04b-old-city-afternoon-rest', cam: [290, 2.2, 215], look: [330, 4, 250], hour: 14.5 },
+  // Eye height 1.7 m on real road centrelines near each landmark (computed from data/interim/roads.parquet).
+  { name: '01-race-course-sunset', cam: [-1217.5, 1.7, 1364.6], look: [-1220.4, 3, 1226.1], hour: 17.9 },
+  { name: '02-jubilee-watson', cam: [-65.7, 1.7, 622.2], look: [0.6, 6, 595.2], hour: 10 },
+  { name: '03-kaba-gandhi-no-delo', cam: [282.1, 1.7, 252.2], look: [318.2, 5, 241.0], hour: 11 },
+  { name: '04-soni-bazaar', cam: [604.8, 1.7, 262.4], look: [639.4, 5, 261.3], hour: 11 },
+  { name: '04b-soni-bazaar-afternoon-rest', cam: [604.8, 1.7, 262.4], look: [639.4, 5, 261.3], hour: 14.5 },
+  { name: '04c-soni-bazaar-night', cam: [604.8, 1.7, 262.4], look: [639.4, 5, 261.3], hour: 20.5 },
+  { name: '05-trikon-baug', cam: [-16.0, 1.7, 2.4], look: [0.5, 3, 0.1], hour: 11 },
+  { name: '07-rajkumar-college', cam: [-322.9, 1.7, -188.1], look: [-400.7, 6, -153.1], hour: 9 },
   { name: '15-aerial-centre-night', cam: [-450, 320, -550], look: [-250, 0, 450], hour: 21 },
   { name: '15b-aerial-centre-day', cam: [-450, 320, -550], look: [-250, 0, 450], hour: 12 },
 ];
@@ -19,7 +23,7 @@ async function boot(page: Page) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   const t0 = Date.now();
-  await page.goto('/');
+  await page.goto('/?date=2026-10-09');
   await page.waitForFunction(() => (window as any).__game?.ready, null, { timeout: 120_000 });
   const bootMs = Date.now() - t0;
   return { errors, bootMs };
@@ -59,7 +63,7 @@ const waitSim = (page: Page, secs: number) => page.evaluate((d) => new Promise<v
 }), secs);
 
 test('walks and rides the scooter without falling through the world', async ({ page }) => {
-  await page.goto('/?fixedstep=1&shadows=0');
+  await page.goto('/?fixedstep=1&shadows=0&date=2026-10-09');
   await page.waitForFunction(() => (window as any).__game?.ready, null, { timeout: 120_000 });
   const start = await page.evaluate(() => (window as any).__game.player());
   await page.locator('#game').click();

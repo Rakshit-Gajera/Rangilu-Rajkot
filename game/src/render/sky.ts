@@ -196,7 +196,7 @@ export class Environment {
     const peak = Math.max(this.hemi.color.r, this.hemi.color.g, this.hemi.color.b, 1e-3);
     this.hemi.color.multiplyScalar(1 / peak); // colour only; brightness comes from intensity
     this.hemi.groundColor.setRGB(0.55, 0.45, 0.34, THREE.SRGBColorSpace).multiplyScalar(0.3 + 0.7 * twilight);
-    this.hemi.intensity = 0.22 + 0.5 * twilight + 0.6 * day;
+    this.hemi.intensity = 0.35 + 0.5 * twilight + 0.75 * day;
 
     // Haze matches the horizon so distant buildings melt into the sky.
     this.fog.color.copy(this.hor);

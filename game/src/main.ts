@@ -64,7 +64,9 @@ async function main() {
   const scooter = new Scooter(physics, scene, sx, world.terrainAt(sx, sz) ?? gy, sz, spawn.heading + Math.PI);
   const env = new Environment(scene, renderer, shadowSize);
   // Spawn in the golden hour: 40 minutes before today's real sunset in Rajkot (PROMPT §3.1).
-  const clock = new Clock(params.has('hour') ? Number(params.get('hour')) : goldenHour());
+  // ?date=YYYY-MM-DD pins the calendar day (tests compare screenshots across builds).
+  const day = params.has('date') ? new Date(`${params.get('date')}T12:00:00`) : new Date();
+  const clock = new Clock(params.has('hour') ? Number(params.get('hour')) : goldenHour(day), day);
   const input = new Input(canvas);
   const follow = new FollowCamera(camera, physics);
   const audio = new Audio();
@@ -177,11 +179,12 @@ async function main() {
     stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, drawnTriangles: renderer.info.render.triangles,
       busy: world.tiles.size, frameMs: frameTimes.reduce((a, b) => a + b, 0) / Math.max(frameTimes.length, 1) }),
     setView: (pos: number[], look: number[], hour?: number) => {
+      document.getElementById('hud')!.hidden = true;
       fixedView = { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look) };
       if (hour !== undefined) clock.hours = hour;
       clock.speed = 0;
     },
-    freeView: () => { fixedView = null; },
+    freeView: () => { fixedView = null; document.getElementById('hud')!.hidden = false; },
     ensure: (x: number, z: number, r: number) => world.ensure(x, z, r),
     ground: (x: number, z: number) => physics.groundAt(x, z),
     terrain: (x: number, z: number) => world.terrainAt(x, z),

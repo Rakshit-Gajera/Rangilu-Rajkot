@@ -5,7 +5,18 @@ import { Builder, type GeoBuf } from './geobuf';
 
 /** Edge kind used for the inner face of the parapet (not stored in tiles). */
 export const EDGE_PARAPET = 3;
-const BELOW_GROUND = 1.0; // walls extend under the ground so slopes never show gaps (PROMPT §7.8)
+const BELOW_GROUND = 1.0;
+/** Facade bay width per style zone; must match `bw` in render/materials.ts. */
+const BAY_WIDTH = [2.7, 3.8, 3.2, 4.0, 3.2, 3.2, 3.2];
+
+/** Wall u-range for one edge: a whole number of bays, so windows never wrap a corner.
+ * Edges too short for a bay map onto the blank strip at the start of a bay. */
+export function edgeBays(len: number, bw: number, bayCursor: number): { u0: number; u1: number; bays: number } {
+  const u0 = bayCursor * bw;
+  if (len < 0.6 * bw) return { u0, u1: u0 + 0.18 * bw, bays: 1 };
+  const bays = Math.max(1, Math.round(len / bw));
+  return { u0, u1: u0 + bays * bw, bays };
+} // walls extend under the ground so slopes never show gaps (PROMPT §7.8)
 
 export interface BuildingMeshes {
   walls: GeoBuf;
@@ -107,7 +118,8 @@ export function buildingMeshes(tile: Tile): BuildingMeshes {
     const seed01 = b.seed / 4294967296;
     const yb = b.baseY - BELOW_GROUND;
 
-    let u = 0;
+    const bw = BAY_WIDTH[Math.min(Math.max(b.zone, 1), 7) - 1];
+    let bayCursor = 0;
     for (let k = 0; k < m; k++) {
       const j = (k + 1) % m;
       const x0 = o[2 * k], n0 = o[2 * k + 1], x1 = o[2 * j], n1 = o[2 * j + 1];
@@ -116,18 +128,20 @@ export function buildingMeshes(tile: Tile): BuildingMeshes {
       if (len < 1e-3) continue;
       const nx = dn / len, nz = dx / len; // outward (CCW outline)
       const kind = b.edgeKinds[k];
+      const { u0: u, u1, bays } = edgeBays(len, bw, bayCursor);
+      bayCursor += bays;
       const facade = [b.zone, b.palette, kind, ground];
       const meta = [seed01, b.levels, roofY - b.baseY, b.shop ? 1 : 0];
       const a0 = walls.vertex(x0, yb, -n0, nx, 0, nz, u, -BELOW_GROUND, { facade, meta });
-      const a1 = walls.vertex(x1, yb, -n1, nx, 0, nz, u + len, -BELOW_GROUND, { facade, meta });
-      const a2 = walls.vertex(x1, top, -n1, nx, 0, nz, u + len, b.height, { facade, meta });
+      const a1 = walls.vertex(x1, yb, -n1, nx, 0, nz, u1, -BELOW_GROUND, { facade, meta });
+      const a2 = walls.vertex(x1, top, -n1, nx, 0, nz, u1, b.height, { facade, meta });
       const a3 = walls.vertex(x0, top, -n0, nx, 0, nz, u, b.height, { facade, meta });
       walls.quad(a0, a1, a2, a3);
       // Inner face of the parapet (faces inward), painted as plain plaster by the shader.
       const pf = [b.zone, b.palette, 3, ground];
       const p0 = walls.vertex(x0, roofY, -n0, -nx, 0, -nz, u, roofY - b.baseY, { facade: pf, meta });
-      const p1 = walls.vertex(x1, roofY, -n1, -nx, 0, -nz, u + len, roofY - b.baseY, { facade: pf, meta });
-      const p2 = walls.vertex(x1, top, -n1, -nx, 0, -nz, u + len, b.height, { facade: pf, meta });
+      const p1 = walls.vertex(x1, roofY, -n1, -nx, 0, -nz, u1, roofY - b.baseY, { facade: pf, meta });
+      const p2 = walls.vertex(x1, top, -n1, -nx, 0, -nz, u1, b.height, { facade: pf, meta });
       const p3 = walls.vertex(x0, top, -n0, -nx, 0, -nz, u, b.height, { facade: pf, meta });
       walls.quad(p1, p0, p3, p2);
       const c0 = col.vertex(x0, b.baseY, -n0, 0, 0, 0);
@@ -135,7 +149,6 @@ export function buildingMeshes(tile: Tile): BuildingMeshes {
       const c2 = col.vertex(x1, top, -n1, 0, 0, 0);
       const c3 = col.vertex(x0, top, -n0, 0, 0, 0);
       col.quad(c0, c1, c2, c3);
-      u += len;
     }
 
     // Flat RCC roof. Slight grey variation per building.

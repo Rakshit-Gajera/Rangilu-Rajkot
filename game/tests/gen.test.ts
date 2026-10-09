@@ -63,3 +63,16 @@ describe.skipIf(!hasWorld)('tile generators', () => {
     expect(build.stats.triangles).toBeLessThan(400_000);
   });
 });
+
+describe('facade bays', async () => {
+  const { edgeBays } = await import('../src/gen/buildings');
+  it('fits a whole number of bays on each edge', () => {
+    const r = edgeBays(10, 3.2, 5);
+    expect(r.u0).toBeCloseTo(16);
+    expect((r.u1 - r.u0) / 3.2).toBeCloseTo(3);
+  });
+  it('keeps very short edges blank', () => {
+    const r = edgeBays(1, 3.2, 0);
+    expect(r.u1 / 3.2).toBeLessThan(0.22); // window region starts at 0.22 of a bay
+  });
+});

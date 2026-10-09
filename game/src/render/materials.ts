@@ -108,7 +108,7 @@ ${GLSL_COMMON}`)
         }
       } else if (!isZ6) {
         float w = fBox(vec2(lu, y), vec2(0.3, 1.0), vec2(0.7, groundH - 0.7));
-        if (w > 0.5 && (front || fHash(vec2(bay, seed * 5.0)) > 0.6)) { col = vec3(0.12, 0.14, 0.16); rough = 0.3; }
+        if (w > 0.5 && (front || fHash(vec2(bay, seed * 5.0)) > 0.6)) { col = vec3(0.22, 0.25, 0.28); rough = 0.3; }
         col *= y < 0.45 ? 0.7 : 1.0; // plinth band
       }
     } else if (isZ4 && front && style > 0.35) {
@@ -134,7 +134,7 @@ ${GLSL_COMMON}`)
         col = slab > 0.5 ? plaster * 0.8 : mix(col * 0.55, vec3(0.18, 0.18, 0.2), bar * step(0.1, lv));
       } else if (hasWin && w > 0.5) {
         float wst = fHash(vec2(seed * 5.0, 1.0));
-        vec3 glass = vec3(0.10, 0.13, 0.16);
+        vec3 glass = vec3(0.24, 0.29, 0.34); // dusty glass reflecting the sky
         if (zi == 0 && wst < 0.6) {
           glass = mix(vec3(0.28, 0.20, 0.12), vec3(0.20, 0.40, 0.35), step(0.5, fHash(vec2(seed, 9.0)))); // painted wooden shutters
           glass *= 0.75 + 0.25 * mix(0.5, step(0.5, fract(lu * 6.0)), detail);
@@ -164,7 +164,7 @@ ${GLSL_COMMON}`)
   if (kind > 1.5 && kind < 2.5) col *= 0.82; // shared walls exposed: unpainted, darker
   // Far away: blend window patterns to their average so facades don't shimmer.
   if (!solid && y > groundH && y < roofH && !isZ6) {
-    vec3 avg = mix(plaster, vec3(0.12, 0.13, 0.15), front ? 0.32 : 0.12);
+    vec3 avg = mix(plaster, vec3(0.24, 0.29, 0.34), front ? 0.32 : 0.12);
     col = mix(avg, col, detailW);
     float litAvg = mix(0.45, 0.2, step(23.0, uHour) + step(uHour, 5.0)) * (front ? 0.45 : 0.15);
     emis = mix(vec3(1.0, 0.86, 0.62) * litAvg * uNight * 1.3, emis, detailW);
@@ -173,7 +173,7 @@ ${GLSL_COMMON}`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
   roughnessFactor = rough;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  totalEmissiveRadiance += emis;`);
+  totalEmissiveRadiance += pow(emis, vec3(2.2)) * 0.55; // emissive also designed in sRGB; kept below tone-map white`);
   };
   m.customProgramCacheKey = () => 'facade-v1';
   return m;
@@ -194,7 +194,7 @@ varying float vSurface; varying vec2 vWuv;
 ${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   int s = int(vSurface + 0.5);
-  vec3 c = s == 0 ? vec3(0.20, 0.20, 0.21) : (s == 1 ? vec3(0.58, 0.57, 0.54) : (s == 2 ? vec3(0.50, 0.34, 0.28) : vec3(0.52, 0.42, 0.30)));
+  vec3 c = s == 0 ? vec3(0.33, 0.33, 0.34) : (s == 1 ? vec3(0.66, 0.65, 0.62) : (s == 2 ? vec3(0.50, 0.34, 0.28) : vec3(0.52, 0.42, 0.30)));
   float n1 = fNoise(vWuv * 0.35), n2 = fNoise(vWuv * 3.0), patchy = smoothstep(0.62, 0.7, fNoise(vWuv * 0.08 + 7.0));
   c *= 0.85 + 0.2 * n1 + 0.08 * n2;
   if (s == 0) c = mix(c, vec3(0.30, 0.29, 0.28), patchy * 0.8); // patch repairs
