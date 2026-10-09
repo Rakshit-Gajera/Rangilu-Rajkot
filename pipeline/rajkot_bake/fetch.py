@@ -6,6 +6,7 @@ import hashlib
 import subprocess
 import sys
 import urllib.request
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,20 +36,25 @@ def run(cfg: C.Config, force: bool = False) -> None:
     manifest_path = C.RAW / "manifest.json"
     manifest = C.read_json(manifest_path) if manifest_path.exists() else {}
 
-    for key in ("osm", "dem"):
+    for key in ("osm", "dem", "ghsl_height"):
         dest = C.RAW / src[key]["file"]
         if force or not dest.exists():
             _download(src[key]["url"], dest)
         manifest[key] = {"url": src[key]["url"], "file": src[key]["file"]}
+    with zipfile.ZipFile(C.RAW / src["ghsl_height"]["file"]) as z:
+        tifs = [n for n in z.namelist() if n.endswith(".tif")]
+        if not all((C.RAW / "ghsl" / n).exists() for n in tifs):
+            z.extractall(C.RAW / "ghsl", members=tifs)
 
-    ov = C.RAW / src["overture_buildings"]["file"]
-    if force or not ov.exists() or ov.stat().st_size < 1024:
-        bbox = ",".join(str(v) for v in cfg.bbox)
-        exe = Path(sys.executable).with_name("overturemaps")
-        print("  downloading Overture buildings")
-        subprocess.run([str(exe), "download", f"--bbox={bbox}", "-f", "geoparquet",
-                        "--type=building", "-o", str(ov)], check=True)
-    manifest["overture_buildings"] = {"file": src["overture_buildings"]["file"], "bbox": list(cfg.bbox)}
+    bbox = ",".join(str(v) for v in cfg.bbox)
+    exe = Path(sys.executable).with_name("overturemaps")
+    for key in ("overture_buildings", "overture_places"):
+        dest = C.RAW / src[key]["file"]
+        if force or not dest.exists() or dest.stat().st_size < 1024:
+            print(f"  downloading Overture {src[key]['type']}")
+            subprocess.run([str(exe), "download", f"--bbox={bbox}", "-f", "geoparquet",
+                            f"--type={src[key]['type']}", "-o", str(dest)], check=True)
+        manifest[key] = {"file": src[key]["file"], "bbox": list(cfg.bbox)}
 
     for entry in manifest.values():
         p = C.RAW / entry["file"]

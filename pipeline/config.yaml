@@ -13,6 +13,13 @@ fetch:
       file: dem/Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif
     overture_buildings:
       file: overture/overture_buildings.parquet
+      type: building
+    overture_places:
+      file: overture/overture_places.parquet
+      type: place
+    ghsl_height:
+      url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_H_GLOBE_R2023A/GHS_BUILT_H_ANBH_E2018_GLOBE_R2023A_4326_3ss/V1-0/tiles/GHS_BUILT_H_ANBH_E2018_GLOBE_R2023A_4326_3ss_V1_0_R7_C26.zip
+      file: ghsl/anbh_R7_C26.zip
 
 crs: "EPSG:32642"   # UTM zone 42N
 

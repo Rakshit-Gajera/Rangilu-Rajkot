@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rajkot Preview Map</title>
+<style>
+  :root { --bg:#f4f1ea; --panel:#ffffffee; --ink:#1d1d1f; --muted:#6b6b70; --line:#d8d4cc; --accent:#c2410c; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#121214; --panel:#1c1c20ee; --ink:#ececf0; --muted:#9a9aa3; --line:#34343a; --accent:#fb923c; } }
+  :root[data-theme="dark"] { --bg:#121214; --panel:#1c1c20ee; --ink:#ececf0; --muted:#9a9aa3; --line:#34343a; --accent:#fb923c; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 system-ui, "Segoe UI", sans-serif; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; cursor:grab; touch-action:none; }
+  canvas.drag { cursor:grabbing; }
+  #panel { position:fixed; top:12px; left:12px; width:min(300px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto;
+           background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; backdrop-filter:blur(6px); }
+  h1 { font-size:15px; margin:0 0 2px; } .sub { color:var(--muted); font-size:12px; margin-bottom:10px; }
+  fieldset { border:0; padding:0; margin:0 0 10px; } legend { font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:4px; }
+  label { display:flex; gap:6px; align-items:center; font-size:13px; padding:1px 0; cursor:pointer; }
+  select { width:100%; padding:4px; background:transparent; color:var(--ink); border:1px solid var(--line); border-radius:6px; }
+  #legend { display:grid; grid-template-columns:14px 1fr; gap:3px 6px; font-size:12px; align-items:center; }
+  #legend i { width:14px; height:10px; border-radius:2px; display:block; }
+  #info { position:fixed; right:12px; bottom:12px; width:min(320px, calc(100vw - 24px)); background:var(--panel); border:1px solid var(--line);
+          border-radius:10px; padding:10px 12px; font-size:12px; display:none; white-space:pre-wrap; font-family:ui-monospace, Consolas, monospace; }
+  #scale { position:fixed; left:12px; bottom:12px; font-size:12px; color:var(--muted); }
+  .toggle { margin-top:6px; font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline; background:none; border:0; padding:0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h1>Rangilu Rajkot — preview map</h1>
+  <div class="sub" id="sub"></div>
+  <fieldset><legend>Colour buildings by</legend>
+    <select id="mode">
+      <option value="levels">Floors</option><option value="zone">Style zone</option>
+      <option value="use">Use</option><option value="hsrc">Height source</option><option value="src">Outline source</option>
+    </select></fieldset>
+  <fieldset><legend>Layers</legend>
+    <label><input type="checkbox" id="lyBuild" checked> Buildings</label>
+    <label><input type="checkbox" id="lyRoads" checked> Roads</label>
+    <label><input type="checkbox" id="lyWater" checked> Water</label>
+    <label><input type="checkbox" id="lyZones"> Zone overrides (zones.geojson)</label>
+    <label><input type="checkbox" id="lyTiles"> 500 m tile grid</label>
+    <label><input type="checkbox" id="lyLm" checked> Landmarks</label>
+  </fieldset>
+  <fieldset><legend>Legend</legend><div id="legend"></div></fieldset>
+  <button class="toggle" id="theme">Toggle light/dark</button>
+</div>
+<div id="info"></div>
+<div id="scale"></div>
+<script src="preview_data.js"></script>
+<script>
+(() => {
+  const D = window.PREVIEW;
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const dark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark'
+                     : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.getElementById('sub').textContent = `${D.stats.buildings.toLocaleString()} buildings · ${D.stats.km} km roads · bake ${D.stats.date}`;
+
+  const PAL = {
+    levels: { cats: ['1','2','3','4','5','6–7','8–10','11+'], col: ['#fde68a','#fbbf24','#f59e0b','#ea580c','#dc2626','#be185d','#7e22ce','#1e3a8a'],
+              of: b => { const l=b[0]; return l<=5? l-1 : l<=7? 5 : l<=10? 6 : 7; } },
+    zone: { cats: D.zones, col: ['#b45309','#7c3aed','#16a34a','#2563eb','#db2777','#64748b','#a3a3a3'], of: b => b[1]-1 },
+    use: { cats: D.uses, col: ['#86efac','#60a5fa','#f472b6','#94a3b8','#f97316','#facc15','#f87171','#a78bfa','#2dd4bf','#d4d4d4'], of: b => b[2] },
+    hsrc: { cats: D.hsrcs, col: ['#22c55e','#3b82f6','#a855f7','#eab308','#f97316','#ef4444','#94a3b8'], of: b => b[3] },
+    src: { cats: D.srcs, col: ['#16a34a','#2563eb','#ea580c','#94a3b8'], of: b => b[4] },
+  };
+  const ROADC = { trunk:['#ef4444',1.6], primary:['#f97316',1.4], secondary:['#eab308',1.2], tertiary:['#a3a3a3',1], other:['#8b8b8b',.6] };
+  let mode = 'levels';
+  // View: world metres (x east, y north) -> screen.
+  let scale = 0.05, cx = 0, cy = 0;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  function resize() { cv.width = innerWidth*dpr; cv.height = innerHeight*dpr; draw(); }
+  const sx = x => (x - cx) * scale * dpr + cv.width/2, sy = y => cv.height/2 - (y - cy) * scale * dpr;
+
+  function poly(arr, start, n) {
+    ctx.moveTo(sx(arr[start]), sy(arr[start+1]));
+    for (let k=1;k<n;k++) ctx.lineTo(sx(arr[start+2*k]), sy(arr[start+2*k+1]));
+    ctx.closePath();
+  }
+  function draw() {
+    const dk = dark();
+    ctx.fillStyle = dk ? '#121214' : '#f4f1ea'; ctx.fillRect(0,0,cv.width,cv.height);
+    // Playable + horizon
+    ctx.lineWidth = 2*dpr;
+    for (const [rings, fill, stroke] of [[D.horizon, dk?'#1a1a1d':'#ebe6dc', null],[D.playable, dk?'#18181b':'#faf8f3', dk?'#52525b':'#a8a29e']]) {
+      ctx.beginPath(); for (const r of rings) poly(r, 0, r.length/2);
+      ctx.fillStyle = fill; ctx.fill('evenodd'); if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
+    }
+    if (ly('lyWater')) { ctx.beginPath(); for (const r of D.water) poly(r,0,r.length/2); ctx.fillStyle = dk?'#1e3a5f':'#9cc9e8'; ctx.fill('evenodd'); }
+    if (ly('lyZones')) { ctx.beginPath(); for (const z of D.zoneOverrides) poly(z.r,0,z.r.length/2); ctx.fillStyle='#7c3aed33'; ctx.fill(); ctx.strokeStyle='#7c3aed'; ctx.lineWidth=1.5*dpr; ctx.stroke(); }
+    if (ly('lyRoads')) {
+      for (const cls of ['other','tertiary','secondary','primary','trunk']) {
+        const [c,w] = ROADC[cls]; ctx.strokeStyle = c; ctx.lineWidth = Math.max(.6, w*Math.min(3, scale*8))*dpr; ctx.beginPath();
+        for (const l of D.roads[cls]||[]) { ctx.moveTo(sx(l[0]),sy(l[1])); for (let k=2;k<l.length;k+=2) ctx.lineTo(sx(l[k]),sy(l[k+1])); }
+        ctx.stroke();
+      }
+    }
+    if (ly('lyBuild')) {
+      const P = PAL[mode], groups = P.col.map(() => []);
+      const W = cv.width/(scale*dpr)/2 + 50, H = cv.height/(scale*dpr)/2 + 50;
+      for (const b of D.b) { if (Math.abs(b[5]-cx) > W || Math.abs(b[6]-cy) > H) continue; groups[P.of(b)]?.push(b); }
+      groups.forEach((g, i) => { ctx.beginPath(); for (const b of g) poly(b, 7, (b.length-7)/2); ctx.fillStyle = P.col[i]; ctx.fill(); });
+    }
+    if (ly('lyTiles')) {
+      const t = D.tiles; ctx.strokeStyle = dk?'#ffffff22':'#00000022'; ctx.lineWidth = dpr; ctx.beginPath();
+      for (let i=0;i<=t.ni;i++){ const x=t.x0+i*t.size; ctx.moveTo(sx(x),sy(t.y0)); ctx.lineTo(sx(x),sy(t.y0+t.nj*t.size)); }
+      for (let j=0;j<=t.nj;j++){ const y=t.y0+j*t.size; ctx.moveTo(sx(t.x0),sy(y)); ctx.lineTo(sx(t.x0+t.ni*t.size),sy(y)); }
+      ctx.stroke();
+    }
+    if (ly('lyLm')) {
+      ctx.font = `${12*dpr}px system-ui, sans-serif`; ctx.textBaseline = 'middle';
+      for (const m of D.landmarks) {
+        const c = m.conf==='high' ? '#16a34a' : m.conf==='medium' ? '#d97706' : '#dc2626';
+        const X = sx(m.x), Y = sy(m.y);
+        ctx.beginPath(); ctx.arc(X,Y,5*dpr,0,7); ctx.fillStyle=c; ctx.fill(); ctx.lineWidth=1.5*dpr; ctx.strokeStyle=dk?'#000':'#fff'; ctx.stroke();
+        if (scale > 0.08) { ctx.lineWidth=3*dpr; ctx.strokeText(m.name, X+8*dpr, Y); ctx.fillStyle=dk?'#fff':'#111'; ctx.fillText(m.name, X+8*dpr, Y); }
+      }
+    }
+    document.getElementById('scale').textContent = `${(100/scale).toFixed(0)} m per 100 px · x ${cx.toFixed(0)} y ${cy.toFixed(0)} (from origin)`;
+  }
+  const ly = id => document.getElementById(id).checked;
+  function legend() {
+    const P = PAL[mode]; document.getElementById('legend').innerHTML = P.cats.map((c,i)=>`<i style="background:${P.col[i]}"></i><span>${c}</span>`).join('');
+  }
+  document.getElementById('mode').onchange = e => { mode = e.target.value; legend(); draw(); };
+  document.querySelectorAll('#panel input').forEach(i => i.onchange = draw);
+  document.getElementById('theme').onclick = () => { document.documentElement.dataset.theme = dark() ? 'light' : 'dark'; draw(); };
+
+  // Pan / zoom (mouse, wheel, touch).
+  let drag = null, raf = 0, moved = false;
+  const req = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); };
+  cv.addEventListener('pointerdown', e => { drag = {x:e.clientX, y:e.clientY, cx, cy}; moved = false; cv.classList.add('drag'); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => { if (!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if (Math.abs(dx)+Math.abs(dy)>3) moved=true;
+    cx = drag.cx - dx/scale; cy = drag.cy + dy/scale; req(); });
+  cv.addEventListener('pointerup', e => { cv.classList.remove('drag'); if (!moved) pick(e); drag = null; });
+  cv.addEventListener('wheel', e => { e.preventDefault(); const f = Math.exp(-e.deltaY*0.0015);
+    const wx = cx + (e.clientX - innerWidth/2)/scale, wy = cy - (e.clientY - innerHeight/2)/scale;
+    scale = Math.min(20, Math.max(0.01, scale*f)); cx = wx - (e.clientX - innerWidth/2)/scale; cy = wy + (e.clientY - innerHeight/2)/scale; req(); }, {passive:false});
+  let pinch = null;
+  cv.addEventListener('touchstart', e => { if (e.touches.length===2) { const [a,b]=e.touches; pinch = {d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY), s:scale}; drag=null; } });
+  cv.addEventListener('touchmove', e => { if (pinch && e.touches.length===2) { const [a,b]=e.touches; scale = Math.min(20, Math.max(0.01, pinch.s*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d)); req(); } });
+  cv.addEventListener('touchend', () => pinch = null);
+
+  function inside(b, x, y) {
+    let c = false; const n = (b.length-7)/2;
+    for (let i=0,j=n-1;i<n;j=i++) { const xi=b[7+2*i], yi=b[8+2*i], xj=b[7+2*j], yj=b[8+2*j];
+      if (((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) c=!c; }
+    return c;
+  }
+  function pick(e) {
+    const x = cx + (e.clientX - innerWidth/2)/scale, y = cy - (e.clientY - innerHeight/2)/scale, info = document.getElementById('info');
+    for (const m of D.landmarks) if (Math.hypot(m.x-x, m.y-y) < 8/scale) {
+      info.style.display='block'; info.textContent = `${m.name}\nconfidence: ${m.conf}  status: ${m.status}\n${m.note||''}`; return; }
+    for (const b of D.b) if (Math.abs(b[5]-x) < 80 && Math.abs(b[6]-y) < 80 && inside(b,x,y)) {
+      info.style.display='block';
+      info.textContent = `floors:${b[0]}  (${D.hsrcs[b[3]]})\nzone: ${D.zones[b[1]-1]}\nuse: ${D.uses[b[2]]}\noutline: ${D.srcs[b[4]]}\nx ${b[5]}  y ${b[6]}`;
+      return; }
+    info.style.display='none';
+  }
+  addEventListener('resize', resize); legend(); resize();
+})();
+</script>
+</body>
+</html>

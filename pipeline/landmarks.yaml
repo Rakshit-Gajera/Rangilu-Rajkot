@@ -1,0 +1,142 @@
+# Landmark list (PROMPT §7.11). Each entry: where its position comes from and how sure we are.
+# ref: OSM element (n/w/r + id) or an Overture place point (lon, lat).
+# confidence: high = mapped feature/outline; medium = single POI point; low = unverified / ambiguous.
+# status: located | approx | missing  (missing fails the bake once P3 starts; for now it's reported)
+
+landmarks:
+  - id: race_course
+    name: Race Course (ground, ring road, walking track)
+    refs: [{osm: w465388301, what: Race Course Park}, {osm: w801008359, what: Race Course Ground}]
+    confidence: high
+  - id: cricket_ground
+    name: Madhavrao Scindia Cricket Ground
+    refs: [{overture: [70.78916, 22.30175], what: "Madhavrao Sindhiya Cricket Ground"}]
+    confidence: medium
+  - id: bal_bhavan
+    name: Bal Bhavan
+    refs: [{osm: w491530492}]
+    confidence: high
+  - id: jubilee_garden
+    name: Jubilee Garden
+    refs: [{osm: w468477776, what: Jubilee Park}]
+    confidence: high
+  - id: watson_museum
+    name: Watson Museum
+    refs: [{osm: w1192158114}]
+    confidence: high
+  - id: connaught_hall
+    name: Connaught Hall
+    refs: []
+    confidence: low
+    note: Not in OSM or Overture. Inside Jubilee Garden per general knowledge; needs a pin from Rakshit.
+  - id: kaba_gandhi_no_delo
+    name: Kaba Gandhi no Delo
+    refs: [{osm: n11412508269}]
+    confidence: medium
+  - id: gandhi_museum
+    name: Mahatma Gandhi Museum (former Alfred High School)
+    refs: [{overture: [70.80185, 22.29835], what: Mahatma Gandhi Museum}, {overture: [70.80203, 22.29857], what: Alfred High School}]
+    confidence: medium
+  - id: dolls_museum
+    name: Rotary Dolls Museum
+    refs: [{overture: [70.79134, 22.29356]}]
+    confidence: medium
+  - id: rajkumar_college
+    name: Rajkumar College heritage campus
+    refs: [{overture: [70.79794, 22.29353], what: The Rajkumar College}]
+    confidence: medium
+    note: Campus outline not mapped; Z2 override is a 250 m circle until traced.
+  - id: rajkot_junction
+    name: Rajkot Junction station
+    refs: [{osm: n12101715857}]
+    confidence: high
+  - id: bhaktinagar_station
+    name: Bhaktinagar station
+    refs: [{osm: n5734380272}]
+    confidence: high
+  - id: trikon_baug
+    name: Trikon Baug
+    refs: [{overture: [70.80185, 22.29487], what: "Trikonbaug Ka Raja"}]
+    confidence: medium
+    note: Not in OSM. World origin. Verify the triangle-garden position with Rakshit.
+  - id: soni_bazaar
+    name: Soni Bazaar (gold market)
+    refs: [{overture: [70.80808, 22.29716], what: Soni Bazar Rajkot}]
+    confidence: low
+  - id: darbargadh
+    name: Darbargadh area
+    refs: [{overture: [70.80858, 22.30130], what: Darbar Gadh Museum}]
+    confidence: low
+  - id: dharmendra_road
+    name: Dharmendra Road market
+    refs: []
+    confidence: low
+    note: Street not named in OSM. One Overture shop address mentions it near (70.8045, 22.2966). Needs Rakshit.
+  - id: lakhajiraj_road
+    name: Lakhajiraj Road
+    refs: []
+    confidence: low
+    note: Street not named in OSM. Needs Rakshit.
+  - id: sadar_bazaar
+    name: Sadar Bazaar
+    refs: []
+    confidence: low
+    note: Not found. Needs Rakshit.
+  - id: atal_sarovar
+    name: Atal Sarovar
+    refs: [{osm: w1309620433}]
+    confidence: high
+  - id: aji_dam
+    name: Aji-1 Dam + reservoir
+    refs: [{lake: Aji-1}, {overture: [70.83608, 22.27047], what: Aji Dam}]
+    confidence: medium
+  - id: ramvan
+    name: Ramvan urban forest
+    refs: []
+    confidence: low
+    note: Not found in OSM or Overture places.
+  - id: lalpari_randarda
+    name: Lalpari Lake + Randarda
+    refs: [{lake: Lalpari}, {lake: Randarda}]
+    confidence: medium
+  - id: nyari_dam
+    name: Nyari-1 Dam
+    refs: [{lake: Nyari-1}, {osm: r1917301, what: Nyari Dam}]
+    confidence: medium
+  - id: pradyuman_park
+    name: Pradyuman Park (zoo)
+    refs: [{overture: [70.83957, 22.29920], what: Pradhyuman Zoological Park}]
+    confidence: medium
+  - id: ishwariya_park
+    name: Ishwariya Park
+    refs: [{overture: [70.76541, 22.35352]}]
+    confidence: medium
+  - id: baps_kalawad
+    name: BAPS Swaminarayan Mandir, Kalawad Road
+    refs: [{overture: [70.78191, 22.29297], what: BAPS Swaminarayan Mandir}]
+    confidence: medium
+  - id: ring_road_brts
+    name: 150 Ft Ring Road + Rajpath BRTS Blue Corridor
+    refs: [{osm_road_name: "150 Foot Ring Road|150 feet ring road|BRTS Route"}]
+    confidence: high
+  - id: saurashtra_university
+    name: Saurashtra University campus
+    refs: [{osm: w468475092}]
+    confidence: high
+  - id: old_airport
+    name: Old Rajkot airport airstrip
+    refs: [{osm: w49607535, what: Rajkot Airport (aerodrome)}, {osm: w891069910, what: terminal}]
+    confidence: high
+  - id: trimandir
+    name: Trimandir
+    refs: [{overture: [70.90567, 22.34269], what: Trimandir (Microsoft)}, {overture: [70.80537, 22.30477], what: Trimandir (meta)}]
+    confidence: low
+    note: Two candidate points 10 km apart. Needs Rakshit.
+  - id: darshan_university
+    name: Darshan University (Hadala, Rajkot-Morbi Highway)
+    refs: []
+    confidence: low
+    note: >-
+      Owner's college, added in PROMPT §0.1. Address "At. Hadala, Rajkot-Morbi Highway, Nr. Water Sump"
+      (several college directories). The Overture point (70.81844, 22.32745) contradicts the address
+      (13 km south of Hadala), so it is not used. Needs a pin from Rakshit.
