@@ -1,6 +1,6 @@
 # RANGILU RAJKOT — Open-World Game: Master Project Prompt
 
-> Version 1.1 · 9 October 2026 (v1.0 + owner amendments in §0.1) · Product owner: Rakshit · Builder: Claude Code on Rakshit's PC (or any AI coding agent)
+> Version 1.1 · 9 October 2026 (v1.0 + owner amendments in §0.1) · Product owner: Rakshit · Builder: AI coding agent on Rakshit's PC
 > This prompt is the single source of truth for the project. Day-to-day progress goes in PLAN.md, PROGRESS.md and DECISIONS.md, never in this prompt. Change this prompt only when Rakshit changes the vision.
 
 ---
@@ -173,7 +173,7 @@ No Unity or Unreal, and no UI framework in the game loop. The HUD and menus are 
 
 ### 4.3 Hosting
 - Development: `npm run dev` (Vite, localhost:5173).
-- Shareable build: a claude.ai Artifact. Limits: 16 MB per file, ≤ 511 files and 256 MB per version, so the world ships as region packs (§7.14). Alternatives: GitHub Pages, Cloudflare Pages, Netlify.
+- Shareable build: a hosted web page. Limits of the first-choice host: 16 MB per file, ≤ 511 files and 256 MB per version, so the world ships as region packs (§7.14). Alternatives: GitHub Pages, Cloudflare Pages, Netlify.
 - Licences: code MIT (suggested). The world data package is ODbL, which is required because it's derived from OSM/Overture.
 
 ---
@@ -241,7 +241,7 @@ rajkot-open-world/
 
 ## 6. Environment and workflow
 - **Rakshit's PC (Windows) is the source of truth:** git repo, Python bake, data downloads, `npm run dev`, playtests.
-- **Claude's cloud workspace:** headless Chromium + Playwright for screenshots and performance runs, plus publishing. As of 9 Oct 2026 it reaches npm, PyPI and raw GitHub, but not map-data hosts (Geofabrik, Overture S3, Copernicus and Overpass were blocked). Data downloads therefore run on the PC.
+- **Cloud workspace (optional):** headless Chromium + Playwright for screenshots and performance runs, plus publishing. As of 9 Oct 2026 it reaches npm, PyPI and raw GitHub, but not map-data hosts (Geofabrik, Overture S3, Copernicus and Overpass were blocked). Data downloads therefore run on the PC.
 
 Commands:
 ```

@@ -15,11 +15,11 @@ __pycache__/
 # Node
 node_modules/
 dist/
-.claude/
 game/test-results/
 game/playwright-report/
 
-# Editors / OS
+# Editors / OS / local agent settings
+.*/launch.json
 .vscode/
 .idea/
 Thumbs.db
