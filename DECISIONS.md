@@ -64,3 +64,13 @@ Format: date · decision · why · alternatives considered.
 - The brown Z1 zone matches the old bazaar area.
 - Buildings around Race Course are 5–10 floors, consistent with GHSL; keep the GHSL-based heights.
 - Still open: Dharmendra Rd, Lakhajiraj Rd, Sadar Bazaar, Connaught Hall, Ramvan, Trimandir (waiver stays).
+
+## 2026-10-09 · P1 runtime choices
+- **Tile meshes are built in the bake for road/area surfaces** (union + 10 m grid split + earcut in Python), buildings/terrain in TS workers. Junctions come free from the polygon union. *Trade-off:* tiles are ~80 kB each (≈100 MB for the whole city, over the 30–50 MB target) — move grid splitting to runtime in P2.
+- **Own gradient sky dome instead of three's `Sky` addon.** `Sky` rendered black in most directions on our test renderer and is heavier on phones; the dome gives controllable dusty-haze colours keyed to sun altitude, plus sun, moon and stars.
+- **ACES tone mapping** (AgX washed out the golden-hour and signboard colours).
+- **Spawn at golden hour = 40 min before today's real sunset** (PROMPT says 6:30 pm, but in October Rajkot's sun sets ~18:20, so 6:30 pm is already dark; the intent was golden hour).
+- **Spawn/ground heights come from the tile height grid**, not physics ray casts: Rapier only sees new colliders after a step (this caused an under-ground spawn).
+- **Facade shader uses `flat` varyings and a quantised seed**; per-window hashes amplified interpolation error into speckle.
+- **Automated tests use SwiftShader** (`--use-angle=swiftshader`): headless D3D11 lost the WebGL context. A `?fixedstep=1` mode advances exactly one physics step per frame so tests measure simulated time.
+- **Placeholder character and scooter are procedural** (no external assets yet); CC0 rigs come in P5.

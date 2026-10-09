@@ -1,28 +1,31 @@
 # Progress
 
-## 2026-10-09 · Session 1 — P0 data recon
+## 2026-10-09 · Session 1 (cont.) — P1 vertical slice
 **Done**
-- Repo, docs, MIT licence; bake package `pipeline/rajkot_bake` with stages
-  `fetch → osm → bounds → buildings → heights → classify → landmarks → roads → report`
-  (`python -m rajkot_bake all`). 16 pytest tests pass.
-- Raw data: Geofabrik western-zone (2026-10-08), Copernicus GLO-30, Overture buildings + places,
-  GHSL building height (2018). Provenance + sha256 in `data/raw/manifest.json`.
-- Playable area: 290 km² (21.0 × 19.8 km), 1,259 tiles of 500 m, origin at Trikon Baug, four lakes pinned by OSM id.
-- Buildings: 149,846 (OSM 12k, Microsoft 73k, Google 68k outlines); overlaps clipped into shared walls;
-  heights 92 % GHSL, 8 % heuristic; zones Z1–Z7 and uses classified (first-pass rules).
-- Roads: 3,428 drivable km, 99.5 % in one connected component.
-- Landmarks: 10 located, 14 approximate, 1 ambiguous (Trimandir), 6 missing (need Rakshit).
-- DATA_REPORT.md + interactive preview map (`world/preview/index.html`, serve with the `preview-map`
-  launch config or `python -m http.server -d world/preview`).
+- P0 gate answers applied: Darshan University placed at its real location with a Morbi-highway corridor
+  (playable area now 296 km², 1,308 tiles); old-city zone confirmed; GHSL heights confirmed (5–10 floors near Race Course).
+- Bake: `terrain` (de-bumped Copernicus → 10 m grid, roads flattened, 8 % max grade), `roads` (width, surface,
+  bridges, speeds), `tiles` (`.rtile` v1 + region packs; format in docs/RTILE.md). Slice = 35 tiles, 2.9 MB.
+- Game (`game/`, Vite 8 + TS 7 + three r186 + Rapier 0.21):
+  - streaming world with a worker pool; terrain, building, road, bridge, grass/water/riverbed generators
+  - facade shader: zone palettes, bays, windows (sliding/grille/wooden shutters), balconies, AC units,
+    shop shutters open/closed by time incl. the afternoon rest, signboard bands, night windows, weathering
+  - rooftop water tanks and stair cabins; gradient sky with real sun/moon (suncalc, IST), shadows, haze
+  - player (Rapier character controller), third-person/first-person camera, scooter (ray-cast vehicle, lean,
+    headlight, horn, engine sound), minimap of real roads, clock, speedometer, street/landmark names
+- Tests: 26 vitest (decoder, generators, winding, determinism, budget); Playwright boot + 8 viewpoints +
+  walk/ride test (SwiftShader, `?fixedstep=1`). Boot to playable ≈ 7 s locally.
+
+**Measured (slice fully loaded):** 35 tiles, 9,392 buildings, 285k triangles, 114 draw calls (budget ≤ 800),
+tile generation ≈ 35 ms per tile in workers. Real-GPU frame rate still to be measured on Rakshit's laptop (F3).
 
 **Next**
-- Independent review done; 6 must-fix + 8 later items fixed (DECISIONS.md "P0 review fixes").
-- P0 gate: Rakshit reviews the preview map and answers the gate questions.
-- Darshan University: add Rakshit's pin to `pipeline/config.yaml` (`world.extras[0].lonlat`), re-run `bounds` onward.
+- Independent P1 review → fixes → P1 gate (Rakshit: recognise streets, 60 fps on his laptop).
 
 **Known issues**
-- Old-city footprints are sparse (AI outlines miss wall-to-wall row houses).
-- GHSL suggests 5–8 floors around Race Course/Jubilee — unverified.
-- Z1 override is a rough hull; the relaxed Z1 rule also catches some row-house societies. Z4 corridors and shop ground floors look under-counted.
-- Later review items still open: GHSL raster-grid edge cases, sliver edges < 0.5 m (4.9k buildings), tests for edge metrics/classify/determinism, stage timing log.
-- Overture `division_area` download fails with S3 network errors (not needed now).
+- No footpaths/kerbs, street lights, trees or traffic yet (P3/P4). Signboards have no text yet (P3).
+- Character and rider are placeholders (stiff pose); scooter is boxy.
+- Tile size ≈ 80 kB → whole city ≈ 100 MB (target 30–50 MB): move surface grid-splitting to runtime in P2.
+- Lane markings double up across tile seams (10 m overlap).
+- Landmarks are not modelled yet (P3); Watson Museum etc. are ordinary generated buildings.
+- Open P0 items: Dharmendra Rd, Lakhajiraj Rd, Sadar Bazaar, Connaught Hall, Ramvan, Trimandir positions.
