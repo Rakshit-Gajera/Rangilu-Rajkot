@@ -166,10 +166,10 @@ ${GLSL_COMMON}`)
   if (!solid && y > groundH && y < roofH && !isZ6) {
     vec3 avg = mix(plaster, vec3(0.12, 0.13, 0.15), front ? 0.32 : 0.12);
     col = mix(avg, col, detailW);
-    float litAvg = mix(0.45, 0.2, step(23.0, uHour) + step(uHour, 5.0)) * (front ? 0.3 : 0.1);
-    emis = mix(vec3(1.0, 0.86, 0.62) * litAvg * uNight * 0.85, emis, detailW);
+    float litAvg = mix(0.45, 0.2, step(23.0, uHour) + step(uHour, 5.0)) * (front ? 0.45 : 0.15);
+    emis = mix(vec3(1.0, 0.86, 0.62) * litAvg * uNight * 1.3, emis, detailW);
   }
-  diffuseColor.rgb = col;`)
+  diffuseColor.rgb = pow(col, vec3(2.2)); // colours above are designed in sRGB`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
   roughnessFactor = rough;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -200,7 +200,7 @@ ${GLSL_COMMON}`)
   if (s == 0) c = mix(c, vec3(0.30, 0.29, 0.28), patchy * 0.8); // patch repairs
   if (s == 1) c *= 1.0 - 0.12 * step(0.94, fract(vWuv.x * 0.25)) - 0.12 * step(0.94, fract(vWuv.y * 0.25)); // RCC joints
   if (s == 2) c *= 0.85 + 0.15 * step(0.12, fract(vWuv.x * 4.0)) * step(0.12, fract(vWuv.y * 2.0)); // paver blocks
-  diffuseColor.rgb = c;`);
+  diffuseColor.rgb = pow(c, vec3(2.2));`);
   };
   m.customProgramCacheKey = () => 'road-v1';
   return m;
@@ -220,7 +220,7 @@ export function grassMaterial(): THREE.MeshStandardMaterial {
       .replace('#include <common>', `#include <common>\nvarying vec2 vWuv;\n${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   float g = fNoise(vWuv * 0.15) * 0.6 + fNoise(vWuv * 1.3) * 0.4;
-  diffuseColor.rgb = mix(vec3(0.36, 0.42, 0.20), vec3(0.55, 0.52, 0.30), g); // dry-season grass with bald patches`);
+  diffuseColor.rgb = pow(mix(vec3(0.42, 0.48, 0.24), vec3(0.60, 0.56, 0.34), g), vec3(2.2)); // dry-season grass with bald patches`);
   };
   m.customProgramCacheKey = () => 'grass-v1';
   return m;

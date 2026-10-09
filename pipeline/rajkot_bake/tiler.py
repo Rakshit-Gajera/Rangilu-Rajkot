@@ -65,19 +65,34 @@ class Strings:
         return self.index[s]
 
 
+FLYOVER_MIN_LENGTH = 60.0  # shorter bridges (culverts, nala crossings) stay level with their approaches
+MAX_RAMP_GRADE = 0.04      # smoothstep ramps peak at 1.5x this (= 6 %)
+
+
+def bridge_profile(s: np.ndarray, ground: np.ndarray, layer: int) -> np.ndarray:
+    """Deck height along a bridge: straight between its end heights, never below the ground,
+    and for long bridges (flyovers) lifted up to 6.5 m per layer with gentle ramps."""
+    L = float(s[-1]) if len(s) else 0.0
+    deck = np.interp(s, [0.0, max(L, 1e-6)], [ground[0], ground[-1]])
+    if L >= FLYOVER_MIN_LENGTH:
+        ramp = min(130.0, L / 2.2)
+        lift = min(6.5 * max(int(layer), 1), MAX_RAMP_GRADE * ramp)
+        t = np.clip(np.minimum(s, L - s) / ramp, 0, 1)
+        deck = deck + lift * t * t * (3 - 2 * t)
+    return np.maximum(deck, ground)
+
+
 def _road_points(roads: gpd.GeoDataFrame, terrain: Terrain) -> list[np.ndarray]:
-    """Dense (x, n, y) points per road; bridges rise to a deck of 6.5 m per layer."""
+    """Dense (x, n, y) points per road at 5 m spacing; bridges follow `bridge_profile`."""
     out = []
     for line, bridge, layer in zip(roads.geometry.values, roads.bridge.values, roads.layer.values):
         L = line.length
         n = max(2, int(L // 5) + 1)
-        p = shapely.get_coordinates(shapely.line_interpolate_point(line, np.linspace(0, L, n)))
+        s = np.linspace(0, L, n)
+        p = shapely.get_coordinates(shapely.line_interpolate_point(line, s))
         y = terrain.sample(p) - 100.0
         if bridge:
-            s = np.linspace(0, L, n)
-            ramp = max(min(120.0, L / 2.5), 1.0)
-            t = np.clip(np.minimum(s, L - s) / ramp, 0, 1)
-            y = y + 6.5 * max(int(layer), 1) * t * t * (3 - 2 * t)
+            y = bridge_profile(s, y, layer)
         out.append(np.column_stack([p, y]))
     return out
 

@@ -1,9 +1,8 @@
-import * as SunCalcNs from 'suncalc';
+import { getMoonPosition, getPosition, getTimes } from 'suncalc';
 import * as THREE from 'three';
 import { worldUniforms } from './materials';
 
-// suncalc is CommonJS: depending on the bundler the API is on the namespace or on .default.
-const SunCalc = ((SunCalcNs as unknown as { default?: typeof SunCalcNs }).default ?? SunCalcNs) as typeof SunCalcNs;
+const DEG = Math.PI / 180;
 
 const LAT = 22.30;
 const LON = 70.80;
@@ -41,18 +40,24 @@ export class Clock {
 
 /** Local hour (IST) 40 minutes before sunset today. */
 export function goldenHour(date = new Date()): number {
-  const sunset = SunCalc.getTimes(date, LAT, LON).sunset;
+  const sunset = getTimes(date, LAT, LON).sunset;
   if (!sunset) return 17.5;
   const h =((sunset.getUTCHours() + sunset.getUTCMinutes() / 60 + IST_OFFSET_H) % 24) - 2 / 3;
   return Number.isFinite(h) ? h : 17.5;
 }
 
-/** Direction towards a body from suncalc altitude/azimuth (azimuth 0 = south, + towards west). */
-export function skyDirection(altitude: number, azimuth: number, out = new THREE.Vector3()): THREE.Vector3 {
-  return out.set(-Math.sin(azimuth) * Math.cos(altitude), Math.sin(altitude), Math.cos(azimuth) * Math.cos(altitude));
+/** Sun or moon position in radians: altitude above the horizon, azimuth clockwise from north. */
+export function bodyPosition(body: 'sun' | 'moon', date: Date): { altitude: number; azimuth: number } {
+  const p = body === 'sun' ? getPosition(date, LAT, LON) : getMoonPosition(date, LAT, LON); // suncalc 2.x: degrees
+  return { altitude: p.altitude * DEG, azimuth: p.azimuth * DEG };
 }
 
-const C = (r: number, g: number, b: number) => new THREE.Color(r, g, b);
+/** World direction towards a body (x east, y up, z south). */
+export function skyDirection(altitude: number, azimuth: number, out = new THREE.Vector3()): THREE.Vector3 {
+  return out.set(Math.sin(azimuth) * Math.cos(altitude), Math.sin(altitude), -Math.cos(azimuth) * Math.cos(altitude));
+}
+
+const C = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
 /** Sky colour keys by sun altitude (radians): [altitude, zenith, horizon]. Dusty Saurashtra haze. */
 const SKY_KEYS: [number, THREE.Color, THREE.Color][] = [
   [-0.30, C(0.010, 0.014, 0.035), C(0.030, 0.040, 0.075)], // night
@@ -148,8 +153,8 @@ export class Environment {
 
   update(clock: Clock, focus: THREE.Vector3, camera: THREE.Camera) {
     const t = clock.instant();
-    const sp = SunCalc.getPosition(t, LAT, LON);
-    const mp = SunCalc.getMoonPosition(t, LAT, LON);
+    const sp = bodyPosition('sun', t);
+    const mp = bodyPosition('moon', t);
     skyDirection(sp.altitude, sp.azimuth, this.sunDir);
     skyDirection(mp.altitude, mp.azimuth, this.moonDir);
     const alt = sp.altitude;
@@ -190,12 +195,12 @@ export class Environment {
     this.hemi.color.copy(this.zen).lerp(this.hor, 0.45);
     const peak = Math.max(this.hemi.color.r, this.hemi.color.g, this.hemi.color.b, 1e-3);
     this.hemi.color.multiplyScalar(1 / peak); // colour only; brightness comes from intensity
-    this.hemi.groundColor.setRGB(0.55, 0.45, 0.34);
+    this.hemi.groundColor.setRGB(0.55, 0.45, 0.34, THREE.SRGBColorSpace).multiplyScalar(0.3 + 0.7 * twilight);
     this.hemi.intensity = 0.22 + 0.5 * twilight + 0.6 * day;
 
     // Haze matches the horizon so distant buildings melt into the sky.
     this.fog.color.copy(this.hor);
     this.fog.density = 0.0006 + 0.0003 * golden;
-    this.renderer.toneMappingExposure = 0.85 + 0.5 * night;
+    this.renderer.toneMappingExposure = 0.9 + 0.15 * night;
   }
 }

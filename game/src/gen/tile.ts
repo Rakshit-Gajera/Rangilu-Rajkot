@@ -48,6 +48,11 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   });
   const geos = [terrain, buildings.walls, buildings.roofs, buildings.props, roads.surfaces, roads.markings,
     roads.bridges, areas.grass, areas.water, areas.sand];
+  // Generators write vertex colours as sRGB; three.js shades in linear space.
+  for (const g of geos) {
+    const c = g.attrs.color?.[0];
+    if (c) for (let k = 0; k < c.length; k++) c[k] = Math.pow(c[k], 2.2);
+  }
   const triangles = geos.reduce((s, g) => s + g.index.length / 3, 0);
   return {
     key: `${tile.i},${tile.j}`, i: tile.i, j: tile.j, swx, swn, heights: tile.heights, hn: tile.hn,
