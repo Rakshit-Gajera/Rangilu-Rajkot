@@ -3,6 +3,8 @@ import { BrtsDriver } from './brts';
 import { FarsanDelivery } from './delivery';
 import { Garba } from './garba';
 import { KiteFight } from './kite';
+import { GullyCricket } from './cricket';
+import { Lokmelo } from './lokmelo';
 import { RickshawRides } from './rickshaw';
 import { TimeTrial } from './timetrial';
 
@@ -10,7 +12,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 /** Activities menu (J), the running activity's panel, and quitting (X) — PROMPT §3.6, §10. */
 export class Activities {
-  readonly list: Activity[] = [new RickshawRides(), new FarsanDelivery(), new TimeTrial(), new BrtsDriver(), new Garba(), new KiteFight()];
+  readonly list: Activity[] = [new RickshawRides(), new FarsanDelivery(), new TimeTrial(), new BrtsDriver(), new Garba(), new KiteFight(), new GullyCricket(), new Lokmelo()];
   current: Activity | null = null;
   open = false;
   private menu: HTMLDivElement;

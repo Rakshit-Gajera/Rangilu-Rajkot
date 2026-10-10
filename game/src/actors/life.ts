@@ -87,7 +87,7 @@ export class Life {
   maxCows: number;
   maxParked: number;
   /** Busier places (e.g. the player's neighbourhood): more parked vehicles and people around. */
-  denseZones: { x: number; n: number; r: number }[] = [];
+  denseZones: { x: number; n: number; r: number; peds?: number; event?: boolean }[] = [];
   onHorn: ((x: number, y: number, z: number, kind: ModelName) => void) | null = null;
 
   constructor(private graph: RoadGraph, private world: World, private physics: Physics, scene: THREE.Scene,
@@ -223,7 +223,11 @@ export class Life {
       cow: this.maxCows,
       parked: this.maxParked,
     };
-    if (this.denseZones.some((z) => Math.hypot(z.x - px, z.n - pn) < z.r)) { target.parked *= 2; target.ped *= 1.5; }
+    for (const z of this.denseZones) {
+      if (Math.hypot(z.x - px, z.n - pn) > z.r) continue;
+      target.parked *= z.event ? 1 : 2;
+      target.ped *= z.peds ?? 1.5;
+    }
     for (let k = 0; k < 2; k++) {
       let pick: Kind | null = null, worst = 1;
       for (const kind of ['vehicle', 'ped', 'cow', 'parked'] as Kind[]) {

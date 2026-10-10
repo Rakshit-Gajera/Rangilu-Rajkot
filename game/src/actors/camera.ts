@@ -28,7 +28,7 @@ export class FollowCamera {
       this.yaw += d * (1 - Math.exp(-dt * 2.5));
     }
     this.yaw -= input.mouseDX * 0.0025 * this.sensitivity;
-    this.pitch = THREE.MathUtils.clamp(this.pitch - input.mouseDY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1), -1.2, 0.6);
+    this.pitch = THREE.MathUtils.clamp(this.pitch - input.mouseDY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1), -1.2, 1.1);
     if (input.wheel) this.distance = THREE.MathUtils.clamp(this.distance + input.wheel * 0.8, opts.minDist ?? 2.5, 14);
     if (input.hit('KeyC')) this.firstPerson = !this.firstPerson;
     this.target.lerp(focus, 1 - Math.exp(-dt * 18));

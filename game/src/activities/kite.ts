@@ -129,9 +129,9 @@ export class KiteFight implements Activity {
       const want = Math.atan2(r.anchor.x - mePos.x, r.anchor.z - mePos.z);
       let d = want - r.az;
       d = Math.atan2(Math.sin(d), Math.cos(d));
-      r.az += Math.max(-0.4, Math.min(0.4, d)) * dt * 0.6 + Math.sin(r.wander * 1.3) * dt * 0.1;
+      r.az += Math.max(-0.4, Math.min(0.4, d)) * dt * 0.3 + Math.sin(r.wander * 1.3) * dt * 0.12;
       r.el = 0.7 + Math.sin(r.wander * 0.5) * 0.25;
-      r.pull = Math.sin(r.wander * 2.1) > 0.55;
+      r.pull = Math.sin(r.wander * 2.1) > 0.35; // rivals tug often: time your own pull
       this.place(r);
     }
     this.place(me);

@@ -20,6 +20,10 @@ export interface ActivityContext {
   input: Input;
   /** Spawn a vehicle at a road point (x, n) facing `heading` and put the player in it. */
   putInVehicle(kind: VehicleKind, x: number, n: number, heading: number): Promise<void>;
+  /** Teleport the player (on foot) to (x, n). */
+  putOnFoot(x: number, n: number): Promise<void>;
+  /** Busier streets around (x, n): people × scale within r metres (scale 1 clears it). */
+  crowd(x: number, n: number, r: number, scale: number): void;
   setWaypoint(x: number, n: number): void;
   clearWaypoint(): void;
   flash(text: string): void;

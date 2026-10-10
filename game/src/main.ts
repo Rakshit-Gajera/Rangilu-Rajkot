@@ -269,7 +269,7 @@ async function main() {
     void id;
   }, (x, n) => { void fastTravel(x, n); });
   function pay(rupees: number, why: string) {
-    save.money += rupees;
+    save.money = Math.max(0, save.money + rupees);
     hud.setMoney(save.money);
     hud.flash(why);
   }
@@ -298,6 +298,12 @@ async function main() {
       const y = world.terrainAt(x, -n) ?? here().y;
       enterVehicle(garage.spawn(kind, x, y + 0.2, -n, heading));
     },
+    putOnFoot: async (x, n) => { exitVehicle(); await fastTravel(x, n, true); },
+    crowd: (x, n, r, scale) => {
+      if (!life) return;
+      life.denseZones = life.denseZones.filter((z) => !z.event);
+      if (scale > 1) life.denseZones.push({ x, n, r, peds: scale, event: true });
+    },
     setWaypoint: (x, n) => { cityMap?.setWaypoint(x, n); routeTimer = 0; routeAge = 99; },
     clearWaypoint: () => { cityMap?.clearWaypoint(); cityMap?.setRoute(null, 0); },
     flash: (t) => hud.flash(t),
@@ -324,7 +330,7 @@ async function main() {
   const activities = activityCtx ? new Activities(activityCtx, (a) => {
     const b = save.records[a.id];
     if (b === undefined) return '';
-    return a.id === 'timetrial' ? `${Math.floor(-b / 60)}:${String(Math.floor(-b % 60)).padStart(2, '0')} lap` : a.id === 'garba' ? `${b} points` : a.id === 'kite' ? `${b} kites cut` : `₹${b} in one go`;
+    return a.id === 'timetrial' ? `${Math.floor(-b / 60)}:${String(Math.floor(-b % 60)).padStart(2, '0')} lap` : a.id === 'garba' ? `${b} points` : a.id === 'kite' ? `${b} kites cut` : a.id === 'cricket' ? `${b} runs` : a.id === 'lokmelo' ? 'all stalls visited' : `₹${b} in one go`;
   }) : null;
 
   // Edge of the world and safety net (PROMPT §7.1, §9.1): checked twice a second.
