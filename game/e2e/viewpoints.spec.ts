@@ -13,6 +13,15 @@ const VIEWS: { name: string; cam: [number, number, number]; look: [number, numbe
   { name: '04c-soni-bazaar-night', cam: [604.8, 1.7, 262.4], look: [639.4, 5, 261.3], hour: 20.5 },
   { name: '05-trikon-baug', cam: [-16.0, 1.7, 2.4], look: [0.5, 3, 0.1], hour: 11 },
   { name: '07-rajkumar-college', cam: [-322.9, 1.7, -188.1], look: [-400.7, 6, -153.1], hour: 9 },
+  // Phase 3: flyovers and chowks (positions from data/interim/roads.parquet and chowks.parquet).
+  { name: '30-flyover-ambedkar-chowk', cam: [290, 3, 1000], look: [190, 7, 1055], hour: 10 },
+  { name: '31-flyover-150ft-ring-road', cam: [-3040, 4, -880], look: [-3125, 7, -800], hour: 16 },
+  { name: '32-indira-gandhi-statue', cam: [-3125, 4, -760], look: [-3144, 5, -741], hour: 10 },
+  { name: '33-mahatma-gandhi-statue', cam: [-22, 4, 470], look: [-41, 4, 491], hour: 10 },
+  { name: '34-hanumanji-statue', cam: [185, 4, 1050], look: [170, 8, 1075], hour: 10 },
+  { name: '35-fountain-chowk', cam: [-1045, 6, 345], look: [-1071, 2, 375], hour: 11 },
+  { name: '36-bhaktinagar-circle', cam: [10, 6, -1590], look: [37, 1, -1621], hour: 18 },
+  { name: '37-chowk-night', cam: [-1045, 6, 345], look: [-1071, 2, 375], hour: 21 },
   { name: '15-aerial-centre-night', cam: [-450, 320, -550], look: [-250, 0, 450], hour: 21 },
   { name: '15b-aerial-centre-day', cam: [-450, 320, -550], look: [-250, 0, 450], hour: 12 },
 ];
@@ -39,6 +48,10 @@ test('boots to playable and captures viewpoints', async ({ page }) => {
   await page.screenshot({ path: `${OUT}/00-spawn-third-person.png` });
   const results: Record<string, unknown> = { bootMs };
   for (const v of VIEWS) {
+    // Load the area first, and stand on the nearest real road (never inside a building or under the ground).
+    const [rx, rn] = await page.evaluate(([x, n]) => (window as any).__game.roadNear(x, n), [v.cam[0], v.cam[2]]);
+    if (v.cam[1] < 100 && Math.hypot(rx - v.cam[0], rn - v.cam[2]) < 60) { v.cam[0] = rx; v.cam[2] = rn; }
+    await page.evaluate(([x, n]) => (window as any).__game.ensure(x, -n, 300), [v.cam[0], v.cam[2]]);
     const pose = await page.evaluate(([cam, look]) => {
       const g = (window as any).__game;
       const gc = g.terrain(cam[0], -cam[2]) ?? 30;

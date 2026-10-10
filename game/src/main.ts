@@ -299,6 +299,7 @@ async function main() {
     quality: () => quality.name,
     route: (x0: number, n0: number, x1: number, n1: number) => graph?.route(x0, n0, x1, n1)?.points ?? null,
     worldStats: () => world.stats(),
+    roadNear: (x: number, n: number) => (graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n]),
     idle: () => world.stats().queued === 0,
     heap: () => (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0,
     geometries: () => renderer.info.memory.geometries,

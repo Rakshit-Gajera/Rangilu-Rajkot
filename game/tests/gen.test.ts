@@ -69,3 +69,24 @@ describe('facade bays', async () => {
     expect(r.u1 / 3.2).toBeLessThan(0.22); // window region starts at 0.22 of a bay
   });
 });
+
+describe.skipIf(!hasWorld)('chowk generator', async () => {
+  const { decodeTile } = await import('../src/world/rtile');
+  const { manifest, tile: load } = openWorld();
+  // Find tiles with chowks: one with a statue and one with a fountain.
+  const keys = Object.keys(manifest.tiles);
+  const pick = (kind: number) => keys.find((k) => decodeTile(...load(k)).chowks.some((c) => c.kind === kind));
+  for (const [label, kind] of [['statue', 2], ['fountain', 1]] as const) {
+    const key = pick(kind);
+    it(`builds a ${label} chowk with outward-facing, finite geometry`, () => {
+      expect(key).toBeDefined();
+      const [ab, off, len] = load(key!);
+      const b = buildTile(ab, off, len, manifest.tileSize);
+      for (const g of [b.chowks.solid, b.chowks.deco]) {
+        expect(g.index.length).toBeGreaterThan(0);
+        expect(finite(g)).toBe(true);
+        expect(windingAgreement(g)).toBeGreaterThan(0.97);
+      }
+    });
+  }
+});

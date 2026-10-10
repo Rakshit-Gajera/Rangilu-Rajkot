@@ -249,3 +249,17 @@ export function farMaterial(): THREE.MeshLambertMaterial {
   m.customProgramCacheKey = () => 'far-v1';
   return m;
 }
+
+/** Lamp glass and other small lights: vertex colour, glowing at night. */
+export function lampMaterial(): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uNight = worldUniforms.uNight;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uNight;')
+      .replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * uNight * 3.0;');
+  };
+  m.customProgramCacheKey = () => 'lamp-v1';
+  return m;
+}

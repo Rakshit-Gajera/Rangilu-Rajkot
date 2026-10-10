@@ -2,6 +2,7 @@ import { decodeTile, type Tile } from '../world/rtile';
 import { buildingMeshes, type BuildingMeshes } from './buildings';
 import { transferables, type GeoBuf } from './geobuf';
 import { areaMeshes, roadMeshes, type AreaMeshes, type RoadMeshes } from './roads';
+import { chowkMeshes, type ChowkMeshes } from './chowks';
 import { farMesh, type FarBuild } from './far';
 import { terrainMesh } from './terrain';
 
@@ -19,6 +20,7 @@ export interface TileBuild {
   buildings: BuildingMeshes;
   roads: RoadMeshes;
   areas: AreaMeshes;
+  chowks: ChowkMeshes;
   /** Road centrelines for the minimap: per road [rank, ...x, n pairs] in world metres (x, n). */
   minimapRoads: Float32Array[];
   /** strings.json index per minimap road (0xFFFFFFFF = unnamed). */
@@ -35,6 +37,9 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const buildings = buildingMeshes(tile);
   const roads = roadMeshes(tile, swx, swn);
   const areas = areaMeshes(tile, swx, swn);
+  const chowks = chowkMeshes(tile);
+  // Chowk kerbs, plinths and statues are solid: append them to the building collider.
+  buildings.collider = concatMesh(buildings.collider, chowks.solid);
   const shown = tile.roads.filter((r) => !r.tunnel);
   const minimapRoadNames = shown.map((r) => r.name);
   const minimapRoads = shown.map((r) => {
@@ -48,7 +53,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
     return out;
   });
   const geos = [terrain, buildings.walls, buildings.roofs, buildings.props, roads.surfaces, roads.markings,
-    roads.bridges, areas.grass, areas.water, areas.sand];
+    roads.bridges, areas.grass, areas.water, areas.sand, chowks.solid, chowks.deco, chowks.lamps];
   // Generators write vertex colours as sRGB; three.js shades in linear space.
   for (const g of geos) {
     const c = g.attrs.color?.[0];
@@ -57,7 +62,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const triangles = geos.reduce((s, g) => s + g.index.length / 3, 0);
   return {
     key: `${tile.i},${tile.j}`, i: tile.i, j: tile.j, swx, swn, heights: tile.heights, hn: tile.hn,
-    terrain, buildings, roads, areas, minimapRoads, minimapRoadNames,
+    terrain, buildings, roads, areas, chowks, minimapRoads, minimapRoadNames,
     landmarks: tile.landmarks.map((l) => ({ name: l.name, x: swx + l.x, n: swn + l.n })),
     stats: { buildings: tile.buildings.length, triangles, ms: performance.now() - t0 },
   };
@@ -66,7 +71,8 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
 export function tileTransferables(b: TileBuild): ArrayBuffer[] {
   const out: ArrayBuffer[] = [b.heights.buffer as ArrayBuffer];
   for (const g of [b.terrain, b.buildings.walls, b.buildings.roofs, b.buildings.props, b.roads.surfaces,
-    b.roads.markings, b.roads.bridges, b.areas.grass, b.areas.water, b.areas.sand]) transferables(g, out);
+    b.roads.markings, b.roads.bridges, b.areas.grass, b.areas.water, b.areas.sand, b.chowks.solid, b.chowks.deco,
+    b.chowks.lamps]) transferables(g, out);
   for (const c of [b.buildings.collider, b.roads.bridgeCollider]) out.push(c.position.buffer as ArrayBuffer, c.index.buffer as ArrayBuffer);
   for (const r of b.minimapRoads) out.push(r.buffer as ArrayBuffer);
   return out;
@@ -85,4 +91,16 @@ export function buildFarTile(buf: ArrayBuffer, off: number, len: number, tileSiz
 
 export function farTransferables(b: FarBuild): ArrayBuffer[] {
   return transferables(b.mesh, [b.heights.buffer as ArrayBuffer]);
+}
+
+function concatMesh(a: { position: Float32Array; index: Uint32Array }, b: { position: Float32Array; index: Uint32Array }) {
+  if (!b.index.length) return a;
+  const position = new Float32Array(a.position.length + b.position.length);
+  position.set(a.position);
+  position.set(b.position, a.position.length);
+  const index = new Uint32Array(a.index.length + b.index.length);
+  index.set(a.index);
+  const off = a.position.length / 3;
+  for (let k = 0; k < b.index.length; k++) index[a.index.length + k] = b.index[k] + off;
+  return { position, index };
 }
