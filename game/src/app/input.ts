@@ -5,17 +5,38 @@ export class Input {
   /** Keys currently held by a gamepad (kept apart so the pad never releases a keyboard key). */
   private padDown = new Set<string>();
   gamepad = false;
+  /** Remapped keys: physical code -> the default code of the action it now does ('' = unbound). */
+  private remap = new Map<string, string>();
+  /** While set, the next key press goes here instead of the game (key binding UI). */
+  capture: ((code: string) => void) | null = null;
+
+  /** bindings: action (its default key code) -> chosen physical key code. */
+  setBindings(bindings: Record<string, string>) {
+    this.remap.clear();
+    for (const [action, key] of Object.entries(bindings)) {
+      if (key === action) continue;
+      if (!this.remap.has(action)) this.remap.set(action, ''); // the old key no longer does it
+      this.remap.set(key, action);
+    }
+  }
+
+  private map(code: string) {
+    return this.remap.has(code) ? this.remap.get(code)! : code;
+  }
   mouseDX = 0;
   mouseDY = 0;
   wheel = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (e) => {
+      if (this.capture) { e.preventDefault(); const c = this.capture; this.capture = null; c(e.code); return; }
       if (e.code === 'Tab' || e.code === 'F3' || e.code === 'Space') e.preventDefault();
-      if (!this.down.has(e.code)) this.pressed.add(e.code);
-      this.down.add(e.code);
+      const code = this.map(e.code);
+      if (!code) return;
+      if (!this.down.has(code)) this.pressed.add(code);
+      this.down.add(code);
     });
-    window.addEventListener('keyup', (e) => this.down.delete(e.code));
+    window.addEventListener('keyup', (e) => this.down.delete(this.map(e.code)));
     window.addEventListener('blur', () => this.down.clear());
     canvas.addEventListener('click', () => {
       if (document.pointerLockElement !== canvas) canvas.requestPointerLock?.();

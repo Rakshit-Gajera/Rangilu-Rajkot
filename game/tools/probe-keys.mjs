@@ -1,0 +1,23 @@
+import { chromium } from '@playwright/test';
+// Rebind "Horn" to KeyG via the Esc menu; check the scooter honks with G (audio can't be heard; check input mapping).
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 900, height: 700 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+await p.goto('http://localhost:5173/?shadows=0&dynres=0&quality=low&hour=11&save=0');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 180000 });
+await p.keyboard.press('Escape');
+await p.waitForTimeout(300);
+await p.click('button[data-action="KeyW"]');
+await p.keyboard.press('KeyI');
+await p.waitForTimeout(200);
+console.log('W bound to:', await p.textContent('button[data-action="KeyW"]'));
+await p.evaluate(() => document.querySelector('#set-ui').scrollIntoView());
+await p.screenshot({ path: '../shots/103-settings.png' });
+await p.keyboard.press('Escape');
+const a = await p.evaluate(() => window.__game.player());
+await p.keyboard.down('KeyI');
+await p.waitForTimeout(2500);
+await p.keyboard.up('KeyI');
+const c = await p.evaluate(() => window.__game.player());
+console.log('moved with I:', Math.hypot(c[0] - a[0], c[2] - a[2]).toFixed(1), 'm');
+await b.close();

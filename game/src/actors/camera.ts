@@ -12,6 +12,8 @@ export class FollowCamera {
   sensitivity = 1;
   invertY = false;
   baseFov = 62;
+  /** Accessibility: no speed FOV kick and no automatic swing behind vehicles. */
+  reduceMotion = false;
   private current = 4.5;
   private target = new THREE.Vector3();
   private idle = 0;
@@ -22,7 +24,7 @@ export class FollowCamera {
     opts: { minDist?: number; fovBoost?: number; chaseYaw?: number } = {}) {
     this.idle = input.mouseDX || input.mouseDY ? 0 : this.idle + dt;
     // Chase camera: drift back behind the vehicle when the mouse is idle (PROMPT §9.3).
-    if (opts.chaseYaw !== undefined && this.idle > 0.8) {
+    if (opts.chaseYaw !== undefined && this.idle > 0.8 && !this.reduceMotion) {
       let d = opts.chaseYaw - this.yaw;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       this.yaw += d * (1 - Math.exp(-dt * 2.5));
@@ -45,7 +47,7 @@ export class FollowCamera {
     this.current = want < this.current ? want : THREE.MathUtils.lerp(this.current, want, 1 - Math.exp(-dt * 4));
     this.camera.position.copy(this.target).addScaledVector(dir, this.current);
     this.camera.lookAt(this.target);
-    const fov = this.baseFov + (opts.fovBoost ?? 0);
+    const fov = this.baseFov + (this.reduceMotion ? 0 : opts.fovBoost ?? 0);
     if (Math.abs(this.camera.fov - fov) > 0.05) {
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, fov, 1 - Math.exp(-dt * 3));
       this.camera.updateProjectionMatrix();

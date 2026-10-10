@@ -163,6 +163,9 @@ async function main() {
     follow.invertY = s.invertY;
     follow.baseFov = s.fov;
     document.getElementById('help')!.hidden = !s.help;
+    document.documentElement.style.setProperty('--ui', String(s.uiScale));
+    follow.reduceMotion = s.reduceMotion;
+    input.setBindings(s.keys);
   }
   applySettings(settings);
   const touch = isTouchDevice() || params.get('touch') === '1';
@@ -177,7 +180,7 @@ async function main() {
         location.reload();
       });
     },
-  }, settings, applySettings, () => { pause.toggle(false); credits.toggle(true); });
+  }, settings, applySettings, () => { pause.toggle(false); credits.toggle(true); }, input);
   const credits = new Credits();
   let routeTimer = 0;
   let traveling = false;

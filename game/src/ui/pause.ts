@@ -1,5 +1,8 @@
 import { PRESETS, storeQuality, type QualityName } from '../app/quality';
-import { storeSettings, type Settings } from '../app/settings';
+import type { Input } from '../app/input';
+import { ACTIONS, storeSettings, type Settings } from '../app/settings';
+
+const keyName = (code: string) => code.replace(/^Key/, '').replace(/^Digit/, '').replace('Left', ' (left)').replace('Right', ' (right)');
 
 /** Pause menu (Esc): resume, quality preset, controls. Plain DOM over the canvas (PROMPT §4.1). */
 export class PauseMenu {
@@ -7,7 +10,7 @@ export class PauseMenu {
   open = false;
 
   constructor(current: QualityName, saves: { exportSave(): void; importSave(): void } | undefined,
-    private settings: Settings, private onSettings: (s: Settings) => void, private onCredits: () => void) {
+    private settings: Settings, private onSettings: (s: Settings) => void, private onCredits: () => void, private input?: Input) {
     this.root = document.createElement('div');
     this.root.id = 'pause';
     this.root.hidden = true;
@@ -28,6 +31,12 @@ export class PauseMenu {
         <label>Field of view <input id="set-fov" type="range" min="50" max="90" step="1" value="${settings.fov}"></label>
         <label class="check"><input id="set-invert" type="checkbox" ${settings.invertY ? 'checked' : ''}> Invert mouse up/down</label>
         <label class="check"><input id="set-help" type="checkbox" ${settings.help ? 'checked' : ''}> Show key hints</label>
+        <h3>Accessibility</h3>
+        <label>Text and menu size <input id="set-ui" type="range" min="0.8" max="1.6" step="0.1" value="${settings.uiScale}"></label>
+        <label class="check"><input id="set-motion" type="checkbox" ${settings.reduceMotion ? 'checked' : ''}> Reduce motion (no speed zoom or camera swing)</label>
+        <h3>Keys <small>click to change, then press a key</small></h3>
+        <div class="keys" id="set-keys"></div>
+        <button id="set-keys-reset" class="plain">Reset keys</button>
         <h3>Save</h3>
         <p class="note">The game saves itself every 15 seconds in this browser.</p>
         <div class="row"><button id="pause-export">Export save file</button><button id="pause-import">Import save file</button></div>
@@ -53,9 +62,18 @@ export class PauseMenu {
     bind('set-fov', (el) => { this.settings.fov = Number(el.value); });
     bind('set-invert', (el) => { this.settings.invertY = el.checked; });
     bind('set-help', (el) => { this.settings.help = el.checked; });
+    bind('set-ui', (el) => { this.settings.uiScale = Number(el.value); });
+    bind('set-motion', (el) => { this.settings.reduceMotion = el.checked; });
+    this.renderKeys();
+    this.root.querySelector('#set-keys-reset')!.addEventListener('click', () => {
+      this.settings.keys = {};
+      storeSettings(this.settings);
+      this.onSettings(this.settings);
+      this.renderKeys();
+    });
     this.root.querySelector('#pause-credits')!.addEventListener('click', () => this.onCredits());
     // Keys typed into the menu's controls must not drive the game.
-    this.root.addEventListener('keydown', (e) => { if (e.code !== 'Escape') e.stopPropagation(); });
+    this.root.addEventListener('keydown', (e) => { if (e.code !== 'Escape' && !this.input?.capture) e.stopPropagation(); });
     this.root.querySelector('#pause-resume')!.addEventListener('click', () => this.toggle(false));
     this.root.querySelector('#pause-export')!.addEventListener('click', () => saves?.exportSave());
     this.root.querySelector('#pause-import')!.addEventListener('click', () => saves?.importSave());
@@ -67,6 +85,27 @@ export class PauseMenu {
       url.searchParams.set('quality', q);
       location.replace(url);
     });
+  }
+
+  private renderKeys() {
+    const box = this.root.querySelector<HTMLDivElement>('#set-keys')!;
+    box.innerHTML = ACTIONS.map(([code, label]) =>
+      `<span>${label}</span><button data-action="${code}">${keyName(this.settings.keys[code] ?? code)}</button>`).join('');
+    box.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((b) => b.addEventListener('click', () => {
+      if (!this.input) return;
+      b.textContent = 'Press a key…';
+      this.input.capture = (key) => {
+        if (key !== 'Escape') {
+          const action = b.dataset.action!;
+          // One key, one action: unbind it from whatever had it.
+          for (const [a, k] of Object.entries(this.settings.keys)) if (k === key) delete this.settings.keys[a];
+          if (key === action) delete this.settings.keys[action]; else this.settings.keys[action] = key;
+          storeSettings(this.settings);
+          this.onSettings(this.settings);
+        }
+        this.renderKeys();
+      };
+    }));
   }
 
   toggle(force?: boolean) {
