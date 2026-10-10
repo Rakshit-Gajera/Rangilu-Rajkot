@@ -101,3 +101,14 @@ describe('tree models', async () => {
     expect(windingAgreement(g)).toBeGreaterThan(0.97);
   });
 });
+
+describe('shop signs', async () => {
+  const { shopName } = await import('../src/gen/signs');
+  it('gives every shop a deterministic bilingual name', () => {
+    const a = shopName(12345), b = shopName(12345), c = shopName(54321);
+    expect(a).toEqual(b);
+    expect(a.en.length).toBeGreaterThan(3);
+    expect(/[઀-૿]/.test(a.gu)).toBe(true); // Gujarati script
+    expect(c.en === a.en && c.bg === a.bg).toBe(false);
+  });
+});
