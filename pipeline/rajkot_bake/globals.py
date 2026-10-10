@@ -94,6 +94,11 @@ def run(cfg: C.Config) -> None:
         labels.append({"t": m["name"], "gu": None, "x": round(g.x - ox), "n": round(g.y - oy), "kind": "landmark",
                        "id": m["id"]})
 
+    for _, ck in gpd.read_parquet(C.interim("chowks.parquet")).iterrows():
+        if isinstance(ck["name"], str):
+            c = ck.geometry.centroid
+            labels.append({"t": ck["name"], "gu": None, "x": round(c.x - ox), "n": round(c.y - oy), "kind": "chowk"})
+
     data = {
         "version": 1,
         "nodes": [round(v) for v in nodes],

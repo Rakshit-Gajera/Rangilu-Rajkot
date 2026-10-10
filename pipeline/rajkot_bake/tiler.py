@@ -18,6 +18,8 @@ from shapely import STRtree
 from shapely.geometry import box
 
 from . import config as C
+from .chowks import KINDS as CHOWK_KINDS, SUBJECTS as CHOWK_SUBJECTS
+from .flyovers import deck_heights
 from .report import USES
 
 VERSION = 2
@@ -65,34 +67,19 @@ class Strings:
         return self.index[s]
 
 
-FLYOVER_MIN_LENGTH = 60.0  # shorter bridges (culverts, nala crossings) stay level with their approaches
-MAX_RAMP_GRADE = 0.04      # smoothstep ramps peak at 1.5x this (= 6 %)
-
-
-def bridge_profile(s: np.ndarray, ground: np.ndarray, layer: int) -> np.ndarray:
-    """Deck height along a bridge: straight between its end heights, never below the ground,
-    and for long bridges (flyovers) lifted up to 6.5 m per layer with gentle ramps."""
-    L = float(s[-1]) if len(s) else 0.0
-    deck = np.interp(s, [0.0, max(L, 1e-6)], [ground[0], ground[-1]])
-    if L >= FLYOVER_MIN_LENGTH:
-        ramp = min(130.0, L / 2.2)
-        lift = min(6.5 * max(int(layer), 1), MAX_RAMP_GRADE * ramp)
-        t = np.clip(np.minimum(s, L - s) / ramp, 0, 1)
-        deck = deck + lift * t * t * (3 - 2 * t)
-    return np.maximum(deck, ground)
-
-
 def _road_points(roads: gpd.GeoDataFrame, terrain: Terrain) -> list[np.ndarray]:
-    """Dense (x, n, y) points per road at 5 m spacing; bridges follow `bridge_profile`."""
+    """Dense (x, n, y) points per road at 5 m spacing; bridges follow `flyovers.deck_heights`."""
     out = []
-    for line, bridge, layer in zip(roads.geometry.values, roads.bridge.values, roads.layer.values):
+    bridge_idx = np.flatnonzero(roads.bridge.values)
+    decks = deck_heights([roads.geometry.values[k] for k in bridge_idx], list(roads.layer.values[bridge_idx]),
+                         lambda p: terrain.sample(p) - 100.0)
+    deck_of = dict(zip(bridge_idx, decks))
+    for k, line in enumerate(roads.geometry.values):
         L = line.length
         n = max(2, int(L // 5) + 1)
         s = np.linspace(0, L, n)
         p = shapely.get_coordinates(shapely.line_interpolate_point(line, s))
-        y = terrain.sample(p) - 100.0
-        if bridge:
-            y = bridge_profile(s, y, layer)
+        y = deck_of[k] if k in deck_of else terrain.sample(p) - 100.0
         out.append(np.column_stack([p, y]))
     return out
 
@@ -180,6 +167,8 @@ def run(cfg: C.Config) -> None:
 
     lm = gpd.read_parquet(C.interim("landmarks.parquet")).dropna(subset=["geometry"])
     lm_pts = [g if g.geom_type == "Point" else g.representative_point() for g in lm.geometry.values]
+    chowks = gpd.read_parquet(C.interim("chowks.parquet"))
+    chowk_cent = [g.centroid for g in chowks.geometry.values]
 
     packs: dict[tuple[int, int], list[tuple[int, int, bytes]]] = defaultdict(list)
     sizes = []
@@ -268,6 +257,27 @@ def run(cfg: C.Config) -> None:
         sections.append((b"LMRK", struct.pack("<H", len(lms)) + b"".join(
             struct.pack("<IBhh", strings.get(m["name"]), CONF_CODE[m.confidence],
                         int(dm(p.x - sw[0])), int(dm(p.y - sw[1]))) for m, p in lms)))
+
+        cks = [k for k, c in enumerate(chowk_cent) if tbox.contains(c)]
+        parts = [struct.pack("<H", len(cks))]
+        for k in cks:
+            ck = chowks.iloc[k]
+            ring = np.asarray(shapely.simplify(ck.geometry, 0.2).exterior.coords)[:-1]
+            ground = float(terrain.sample(ring).min()) - 100.0
+            c = chowk_cent[k]
+            parts.append(struct.pack("<BBBIIhhhH", CHOWK_KINDS[ck.kind], CHOWK_SUBJECTS[ck.subject], int(bool(ck.island)),
+                                     strings.get(ck["name"]), int(ck.seed) & 0xFFFFFFFF, int(dm(c.x - sw[0])),
+                                     int(dm(c.y - sw[1])), int(dm(ground)), len(ring)))
+            parts.append(dm(ring - sw).tobytes())
+        sections.append((b"CHWK", b"".join(parts)))
+        # Named chowks also count as landmarks for the on-screen place name.
+        lmrk = sections[-2]
+        extra = [(ck_name, chowk_cent[k]) for k in cks if isinstance(ck_name := chowks["name"].values[k], str)]
+        if extra:
+            count = struct.unpack_from("<H", lmrk[1])[0] + len(extra)
+            body = lmrk[1][2:] + b"".join(struct.pack("<IBhh", strings.get(nm), 1, int(dm(c.x - sw[0])),
+                                                      int(dm(c.y - sw[1]))) for nm, c in extra)
+            sections[-2] = (b"LMRK", struct.pack("<H", count) + body)
 
         data = _encode(int(i), int(j), sections)
         sizes.append(len(data))
