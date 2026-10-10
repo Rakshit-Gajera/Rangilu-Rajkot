@@ -15,7 +15,7 @@ const VIEWS: { name: string; cam: [number, number, number]; look: [number, numbe
   { name: '07-rajkumar-college', cam: [-322.9, 1.7, -188.1], look: [-400.7, 6, -153.1], hour: 9 },
   // Phase 3: flyovers and chowks (positions from data/interim/roads.parquet and chowks.parquet).
   { name: '30-flyover-ambedkar-chowk', cam: [36, 2, 1014], look: [210, 8, 1060], hour: 10 },
-  { name: '31-flyover-150ft-ring-road', cam: [-3075, 2, -1000], look: [-3125, 8, -800], hour: 16 },
+  { name: '31-flyover-150ft-ring-road', cam: [-3075, 12, -1000], look: [-3125, 8, -800], hour: 16 },
   { name: '32-indira-gandhi-statue', cam: [-3125, 4, -760], look: [-3144, 5, -741], hour: 10 },
   { name: '33-mahatma-gandhi-statue', cam: [-22, 4, 470], look: [-41, 4, 491], hour: 10 },
   { name: '34-hanumanji-statue', cam: [185, 4, 1050], look: [170, 8, 1075], hour: 10 },

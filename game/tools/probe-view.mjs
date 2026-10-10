@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 640, height: 360 } });
+await p.goto('http://localhost:5173/?shadows=0&date=2026-10-09');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 120000 });
+const cam = [-3075, -1000];
+const r = await p.evaluate(([x, n]) => window.__game.roadNear(x, n), cam);
+console.log('roadNear', r);
+await p.evaluate(([x, n]) => window.__game.ensure(x, -n, 300), r);
+const info = await p.evaluate(([x, n]) => ({ terrain: window.__game.terrain(x, -n), ground: window.__game.ground(x, -n), stats: window.__game.worldStats() }), r);
+console.log(JSON.stringify(info));
+await b.close();
