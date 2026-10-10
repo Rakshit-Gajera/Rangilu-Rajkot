@@ -21,6 +21,8 @@ export class Player {
   private cur = new THREE.Vector3();
   grounded = false;
   speed = 0;
+  /** Seconds of faster sprinting left (street food, PROMPT §3.6). */
+  boost = 0;
   visible = true;
 
   constructor(physics: Physics, scene: THREE.Scene, x: number, y: number, z: number) {
@@ -86,7 +88,9 @@ export class Player {
       .addScaledVector(forward, input.axis('KeyS', 'KeyW'))
       .addScaledVector(right, input.axis('KeyA', 'KeyD'));
     if (move.lengthSq() > 1) move.normalize();
-    const target = input.held('ShiftLeft') || input.held('ShiftRight') ? SPRINT : input.held('ControlLeft') ? WALK : RUN;
+    this.boost = Math.max(0, this.boost - dt);
+    const sprint = SPRINT * (this.boost > 0 ? 1.3 : 1);
+    const target = input.held('ShiftLeft') || input.held('ShiftRight') ? sprint : input.held('ControlLeft') ? WALK : RUN;
     const wantSpeed = move.lengthSq() > 0 ? target : 0;
     this.speed = THREE.MathUtils.lerp(this.speed, wantSpeed, 1 - Math.exp(-dt * 10));
     if (move.lengthSq() > 0) this.heading = Math.atan2(move.x, move.z);

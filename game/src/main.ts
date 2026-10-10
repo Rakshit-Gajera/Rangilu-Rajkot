@@ -6,7 +6,8 @@ import { Garage } from './actors/garage';
 import { Props } from './actors/props';
 import { Weather, type WeatherKind } from './render/weather';
 import { PhotoMode } from './ui/photo';
-import { SandboxMenu, type SandboxHooks } from './ui/sandbox';
+import { FOOD_SHOP, OUTFIT_SHOP, SandboxMenu, type SandboxHooks } from './ui/sandbox';
+import { OUTFITS } from './actors/character';
 import type { ActivityContext } from './activities/activity';
 import { Activities } from './activities/manager';
 import { exportSave, freshSave, importSave, loadSave, storeSave } from './app/save';
@@ -384,7 +385,32 @@ async function main() {
     setPeople: (s) => { if (life) life.pedScale = s; },
     drone: () => setCamMode('drone'),
     photo: () => setCamMode('photo'),
+    outfit: (id) => {
+      const item = OUTFIT_SHOP.find((o) => o.id === id);
+      if (!item || !OUTFITS[id]) return 'Not sold here';
+      if (!save.owned.includes(id)) {
+        if (save.money < item.price) return `Not enough money (₹${item.price})`;
+        save.money -= item.price;
+        save.owned.push(id);
+        hud.setMoney(save.money);
+      }
+      save.outfit = id;
+      player.character.setOutfit(OUTFITS[id]);
+      return `Wearing: ${item.label}`;
+    },
+    food: (id) => {
+      const item = FOOD_SHOP.find((f) => f.id === id);
+      if (!item) return 'Not sold here';
+      if (save.money < item.price) return `Not enough money (₹${item.price})`;
+      save.money -= item.price;
+      hud.setMoney(save.money);
+      player.boost = id === 'ganthiya' ? 120 : 60;
+      audio.chime('good');
+      return item.note;
+    },
+    shopState: () => ({ money: save.money, owned: save.owned, wearing: save.outfit }),
   };
+  if (OUTFITS[save.outfit]) player.character.setOutfit(OUTFITS[save.outfit]);
   const sandbox = new SandboxMenu(sandboxHooks);
   // Pick up where you left off (unless a test pins the start).
   if (!params.has('hour') && save.pos) {

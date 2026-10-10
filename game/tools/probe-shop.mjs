@@ -1,0 +1,22 @@
+import { chromium } from '@playwright/test';
+// Shop: buy and wear the kurta, eat ganthiya; screenshot the menu and the outfit.
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 720, height: 560 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+await p.goto('http://localhost:5173/?shadows=0&fixedstep=1&dynres=0&quality=low&date=2026-10-09&hour=11&save=0');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 120000 });
+const waitSim = (d) => p.evaluate((d) => new Promise((r) => { const t0 = window.__game.simTime(); const f = () => window.__game.simTime() - t0 >= d ? r() : requestAnimationFrame(f); f(); }), d);
+console.log(await p.evaluate(() => window.__game.sandbox.outfit('festive')));
+console.log(await p.evaluate(() => window.__game.sandbox.outfit('kurta')));
+console.log(await p.evaluate(() => window.__game.sandbox.food('ganthiya')));
+console.log(JSON.stringify(await p.evaluate(() => window.__game.sandbox.shopState())));
+await p.keyboard.press('Tab');
+await waitSim(0.2);
+await p.evaluate(() => document.querySelector('#sb-outfits').scrollIntoView());
+await p.screenshot({ path: '../shots/82-shop.png' });
+await p.keyboard.press('Tab');
+const pp = await p.evaluate(() => window.__game.player());
+await p.evaluate(([x, y, z]) => window.__game.setView([x + 0.8, y + 1.5, z + 2.4], [x, y + 1.1, z]), pp);
+await waitSim(0.3);
+await p.screenshot({ path: '../shots/83-kurta.png' });
+await b.close();

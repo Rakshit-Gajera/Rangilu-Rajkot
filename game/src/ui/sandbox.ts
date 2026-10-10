@@ -17,7 +17,23 @@ export interface SandboxHooks {
   setPeople(scale: number): void;
   drone(): void;
   photo(): void;
+  /** Shop: buy (if not owned) and wear an outfit; buy and eat food. Return a message. */
+  outfit(id: string): string;
+  food(id: string): string;
+  shopState(): { money: number; owned: string[]; wearing: string };
 }
+
+export const OUTFIT_SHOP: { id: string; label: string; price: number }[] = [
+  { id: 'casual', label: 'Casual shirt & jeans', price: 0 },
+  { id: 'kurta', label: 'Kurta-pyjama', price: 300 },
+  { id: 'cricket', label: 'Cricket jersey', price: 250 },
+  { id: 'festive', label: 'Festive kurta (Navratri)', price: 600 },
+];
+export const FOOD_SHOP: { id: string; label: string; price: number; note: string }[] = [
+  { id: 'chai', label: 'Cutting chai', price: 15, note: 'Kadak! Sprint faster for a minute.' },
+  { id: 'ganthiya', label: 'Ganthiya with chutney', price: 40, note: "Rajkot's favourite farsan. Sprint faster for two minutes." },
+  { id: 'gola', label: 'Ice-gola', price: 30, note: 'Cool and sticky. Sprint faster for a minute.' },
+];
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEATHER_LABEL: Record<WeatherKind, string> = { clear: 'Clear', haze: 'Summer haze', rain: 'Monsoon rain' };
@@ -54,6 +70,9 @@ export class SandboxMenu {
           <input id="sb-traffic" type="range" min="0" max="2" step="0.1" value="1"></label>
         <label>People <output id="sb-people-out">100%</output>
           <input id="sb-people" type="range" min="0" max="2" step="0.1" value="1"></label>
+        <h3>Shop <small id="sb-money"></small></h3>
+        <div class="grid" id="sb-outfits"></div>
+        <div class="grid" id="sb-food" style="margin-top:8px"></div>
         <h3>Cameras</h3>
         <div class="grid"><button data-drone>Drone camera</button><button data-photo>Photo mode (P)</button></div>
       </div>`;
@@ -82,6 +101,14 @@ export class SandboxMenu {
         $(`${id}-out`).textContent = `${Math.round(Number(el.value) * 100)}%`;
       });
     }
+    this.root.querySelector('#sb-outfits')!.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-outfit]');
+      if (b) { this.note(hooks.outfit(b.dataset.outfit!)); this.refresh(); }
+    });
+    this.root.querySelector('#sb-food')!.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-food]');
+      if (b) { this.note(hooks.food(b.dataset.food!)); this.refresh(); }
+    });
     // Keys typed into the menu's controls must not drive the game.
     this.root.addEventListener('keydown', (e) => { if (e.code !== 'Tab' && e.code !== 'Escape') e.stopPropagation(); });
   }
@@ -93,6 +120,18 @@ export class SandboxMenu {
     const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
     this.root.querySelector('#sb-hour-out')!.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     (this.root.querySelector('#sb-month') as HTMLSelectElement).value = String(this.hooks.getMonth());
+    const shop = this.hooks.shopState();
+    this.root.querySelector('#sb-money')!.textContent = `· you have ₹${shop.money}`;
+    this.root.querySelector('#sb-outfits')!.innerHTML = OUTFIT_SHOP.map((o) => {
+      const own = shop.owned.includes(o.id), wearing = shop.wearing === o.id;
+      return `<button data-outfit="${o.id}" ${wearing ? 'class="on"' : ''}>${o.label}<small>${wearing ? 'Wearing' : own ? 'Wear' : `Buy ₹${o.price}`}</small></button>`;
+    }).join('');
+    this.root.querySelector('#sb-food')!.innerHTML = FOOD_SHOP.map((f) =>
+      `<button data-food="${f.id}">${f.label}<small>₹${f.price}</small></button>`).join('');
+  }
+
+  private note(text: string) {
+    this.root.querySelector('#sb-money')!.textContent = `· ${text}`;
   }
 
   toggle(force?: boolean) {

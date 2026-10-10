@@ -7,6 +7,7 @@ export interface SaveData {
   pos: [number, number, number] | null;
   vehicle: string | null; // kind being driven when saved
   outfit: string;
+  owned: string[]; // outfits bought
   money: number;
   discovered: string[];
   records: Record<string, number>; // activity id → best score (higher is better)
@@ -16,7 +17,7 @@ export interface SaveData {
 const KEY = 'rr.save';
 
 export function freshSave(): SaveData {
-  return { v: 1, pos: null, vehicle: null, outfit: 'casual', money: 200, discovered: [], records: {},
+  return { v: 1, pos: null, vehicle: null, outfit: 'casual', owned: ['casual'], money: 200, discovered: [], records: {},
     settings: { weather: 'clear', traffic: 1, people: 1 } };
 }
 
@@ -38,6 +39,7 @@ export function sanitize(raw: unknown): SaveData | null {
     pos,
     vehicle: typeof r.vehicle === 'string' ? r.vehicle.slice(0, 20) : null,
     outfit: typeof r.outfit === 'string' ? r.outfit.slice(0, 20) : base.outfit,
+    owned: Array.isArray(r.owned) ? [...new Set(['casual', ...r.owned.filter((o): o is string => typeof o === 'string').map((o) => o.slice(0, 20))])].slice(0, 20) : ['casual'],
     money: Math.max(0, Math.min(1e9, Math.round(num(r.money, base.money)))),
     discovered: Array.isArray(r.discovered) ? r.discovered.filter((d): d is string => typeof d === 'string').map((d) => d.slice(0, 40)).slice(0, 200) : [],
     records,
