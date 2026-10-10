@@ -7,6 +7,10 @@ import { Props } from './actors/props';
 import { Weather, type WeatherKind } from './render/weather';
 import { PhotoMode } from './ui/photo';
 import { SandboxMenu, type SandboxHooks } from './ui/sandbox';
+import type { ActivityContext } from './activities/activity';
+import { Activities } from './activities/manager';
+import { exportSave, freshSave, importSave, loadSave, storeSave } from './app/save';
+import { DiscoveryLog } from './ui/discovery';
 import { kindOfModel, SPECS, type Vehicle, type VehicleKind } from './actors/vehicle';
 import { Audio } from './app/audio';
 import { Input } from './app/input';
@@ -117,7 +121,16 @@ async function main() {
   } catch (e) {
     console.warn('map unavailable', e);
   }
-  const pause = new PauseMenu(quality.name);
+  const pause = new PauseMenu(quality.name, {
+    exportSave: () => { writeSave(); exportSave(save); },
+    importSave: () => {
+      void importSave().then((d) => {
+        if (!d) { hud.flash('That file is not a Rangilu Rajkot save'); return; }
+        storeSave(d);
+        location.reload();
+      });
+    },
+  });
   let routeTimer = 0;
   let traveling = false;
   let travelTo: THREE.Vector3 | null = null; // streaming follows the destination while travelling
@@ -152,7 +165,7 @@ async function main() {
     if (routeTimer > 0) return;
     routeTimer = 1.5;
     const p = here(), w = cityMap.waypoint;
-    if (Math.hypot(p.x - w.x, -p.z - w.n) < 30) {
+    if (Math.hypot(p.x - w.x, -p.z - w.n) < 30 && !activities?.current) {
       cityMap.clearWaypoint();
       hud.flash('You have arrived');
       return;
@@ -166,6 +179,73 @@ async function main() {
     if (!r) routeTimer = 10;
   }
   let routeAge = 0;
+
+  // --- Saves, money, discoveries (PROMPT §3.5, §9.10) ---------------------------------
+  const save = params.get('save') === '0' ? freshSave() : loadSave();
+  hud.setMoney(save.money);
+  const discovery = new DiscoveryLog(graph?.data.labels ?? [], save.discovered, (id, total) => {
+    save.discovered = discovery.discovered;
+    pay(25, `New discovery (${total}/${discovery.total}) — ₹25`);
+    void id;
+  }, (x, n) => { void fastTravel(x, n); });
+  function pay(rupees: number, why: string) {
+    save.money += rupees;
+    hud.setMoney(save.money);
+    hud.flash(why);
+  }
+  function writeSave() {
+    const p = here();
+    save.pos = [p.x, p.y, p.z];
+    save.vehicle = drivingV?.kind ?? null;
+    save.discovered = discovery.discovered;
+    save.settings = { weather: weather.kind, traffic: life?.trafficScale ?? 1, people: life?.pedScale ?? 1 };
+    storeSave(save);
+  }
+  addEventListener('visibilitychange', () => { if (document.hidden) writeSave(); });
+  addEventListener('pagehide', writeSave);
+
+  // --- Activities (PROMPT §3.6, §10): J opens the list, X quits ------------------------
+  const activityCtx: ActivityContext | null = graph ? {
+    graph,
+    scene,
+    input,
+    here,
+    driving: () => drivingV,
+    groundY: (x, n) => world.terrainAt(x, -n) ?? here().y,
+    putInVehicle: async (kind, x, n, heading) => {
+      await fastTravel(x, n);
+      exitVehicle();
+      const y = world.terrainAt(x, -n) ?? here().y;
+      enterVehicle(garage.spawn(kind, x, y + 0.2, -n, heading));
+    },
+    setWaypoint: (x, n) => { cityMap?.setWaypoint(x, n); routeTimer = 0; routeAge = 99; },
+    clearWaypoint: () => { cityMap?.clearWaypoint(); cityMap?.setRoute(null, 0); },
+    flash: (t) => hud.flash(t),
+    pay: (r, why) => pay(r, why),
+    record: (id, score) => {
+      const prev = save.records[id];
+      if (prev !== undefined && prev >= score) return false;
+      save.records[id] = score;
+      return true;
+    },
+    best: (id) => save.records[id],
+    roads: (re) => {
+      const out: number[][] = [];
+      const e = graph!.data.edges;
+      for (let k = 0; k < e.a.length; k++) {
+        const nm = e.name[k] >= 0 ? world.strings[e.name[k]] : '';
+        if (nm && re.test(nm)) out.push(graph!.edgePoints(k, true));
+      }
+      return out;
+    },
+    places: () => (graph!.data.labels ?? []).filter((l) => l.kind === 'landmark' || l.kind === 'chowk' || l.kind === 'suburb' || l.kind === 'neighbourhood' || l.kind === 'locality'),
+    sound: (k) => audio.chime(k),
+  } : null;
+  const activities = activityCtx ? new Activities(activityCtx, (a) => {
+    const b = save.records[a.id];
+    if (b === undefined) return '';
+    return a.id === 'timetrial' ? `${Math.floor(-b / 60)}:${String(Math.floor(-b % 60)).padStart(2, '0')} lap` : a.id === 'garba' ? `${b} points` : `₹${b} in one go`;
+  }) : null;
 
   // Edge of the world and safety net (PROMPT §7.1, §9.1): checked twice a second.
   let guardTimer = 0;
@@ -301,6 +381,15 @@ async function main() {
     photo: () => setCamMode('photo'),
   };
   const sandbox = new SandboxMenu(sandboxHooks);
+  // Pick up where you left off (unless a test pins the start).
+  if (!params.has('hour') && save.pos) {
+    const [x, , z] = save.pos;
+    if (world.isTile(x, z)) void fastTravel(x, -z).then(() => {
+      if (save.vehicle && save.vehicle in SPECS) spawnVehicle(save.vehicle as VehicleKind, true);
+    });
+  }
+  if (!params.has('weather') && save.settings.weather !== 'clear') weather.set(save.settings.weather as WeatherKind, true);
+  if (life) { life.trafficScale = save.settings.traffic; life.pedScale = save.settings.people; }
 
   let showPerf = false;
   let fixedView: { pos: THREE.Vector3; look: THREE.Vector3 } | null = null;
@@ -312,6 +401,7 @@ async function main() {
   setTimeout(() => loadingEl.remove(), 700);
 
   let acc = 0;
+  let saveTimer = 15;
   let simTime = 0;
   let lifeMs = 0;
   const worst: Record<string, number> = { sim: 0, hud: 0, route: 0 };
@@ -331,6 +421,8 @@ async function main() {
       // Esc backs out of the innermost thing: photo/drone, then the sandbox menu, then pauses.
       if (camMode !== 'follow') setCamMode('follow');
       else if (sandbox.open) sandbox.toggle(false);
+      else if (activities?.open) activities.toggle(false);
+      else if (discovery.open) discovery.toggle(false);
       else pause.toggle();
     }
     const mapOpen = !!cityMap?.open || pause.open;
@@ -338,10 +430,14 @@ async function main() {
       for (const code of ['KeyM', 'Escape', 'KeyF', 'Delete', 'Backspace']) if (input.hit(code)) cityMap!.key(code);
     } else if (!pause.open && input.hit('KeyM') && cityMap) cityMap.toggle(true);
     if (!mapOpen && input.hit('Tab')) sandbox.toggle();
+    if (!mapOpen && input.hit('KeyJ')) activities?.toggle();
+    if (!mapOpen && input.hit('KeyL')) discovery.toggle();
+    if (!mapOpen && input.hit('KeyX') && activities?.current) activities.quit('Activity ended');
     if (!mapOpen && !sandbox.open && input.hit('KeyP')) setCamMode('photo');
     if (camMode === 'photo') for (const code of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'KeyF', 'Enter']) if (input.hit(code)) photo.key(code);
     const freeCam = camMode === 'drone' ? drone : camMode === 'photo' ? photoCam : null;
-    const controls = mapOpen || traveling || sandbox.open || freeCam ? null : input;
+    const menuOpen = sandbox.open || !!activities?.open || discovery.open;
+    const controls = mapOpen || traveling || menuOpen || freeCam ? null : input;
     // Something to get on: a parked vehicle of ours, or one from traffic (PROMPT §3.3: take any vehicle).
     const nearV = drivingV ? null : garage.nearest(player.position);
     const nearTraffic = !drivingV && !nearV && !!life?.vehicleNear(player.position.x, -player.position.z);
@@ -385,6 +481,13 @@ async function main() {
     if (life) life.update(dt, here(), clock.hours, [here(), ...garage.parked()]);
     lifeMs = lifeMs * 0.95 + (performance.now() - tLife) * 0.05;
     keepAboveGround();
+    if (!traveling) {
+      const h = here();
+      discovery.update(h.x, -h.z, dt);
+      activities?.update(dt);
+    }
+    saveTimer -= dt;
+    if (saveTimer <= 0) { saveTimer = 15; writeSave(); }
 
     mark('simAll');
     // --- Visuals ----------------------------------------------------------------
@@ -526,6 +629,16 @@ async function main() {
     teleportPlayer: (x: number, y: number, z: number) => player.teleport(x, y, z),
     spawnVehicle: (kind: VehicleKind, enter = true) => { spawnVehicle(kind, enter); },
     sandbox: sandboxHooks,
+    money: () => save.money,
+    discovered: () => discovery.discovered,
+    startActivity: (id: string) => { const a = activities?.list.find((q) => q.id === id); return a ? (a.canStart(activityCtx!) ?? activities!.start(a).then(() => 'started')) : 'none'; },
+    activity: () => activities?.current ? { id: activities.current.id, status: activities.current.status() } : null,
+    waypoint: () => cityMap?.waypoint ?? null,
+    // Put whatever we're on (or the player) at (x, n), stopped.
+    moveTo: (x: number, n: number) => {
+      const y = (world.terrainAt(x, -n) ?? here().y) + 0.2;
+      if (drivingV) drivingV.teleport(x, y, -n); else player.teleport(x, y, -n);
+    },
     weather: () => ({ kind: weather.kind, rain: weather.rain, haze: weather.haze }),
     setWeather: (w: WeatherKind) => weather.set(w, true),
     driving: () => {

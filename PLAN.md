@@ -23,14 +23,14 @@ P2 gate passed (Rakshit, 2026-10-10).
 ## P5 tasks (started 2026-10-10 at Rakshit's request)
 - [x] 5.0 Fixes from Rakshit's test drive: detailed character, horn only on vehicles, scooter falling/vanishing,
       people inside buildings, High/Ultra frame rate (tree LOD layer)
-- [ ] 5.1 Every vehicle drivable (bicycle, scooter, motorcycle, chhakdo, auto, hatchback, SUV, bus, tractor); take any traffic vehicle with E
-- [ ] 5.2 Sandbox menu (Tab): spawn vehicles and props (cones, ramps, barrels, stumps); sliders for time, date/season, weather, traffic, people
-- [ ] 5.3 Weather: clear, summer haze, monsoon rain with wet roads; rivers fill only in the monsoon
-- [ ] 5.4 Drone camera (free fly over the city) and photo mode (hide HUD, filters, depth of field)
-- [ ] 5.5 Discovery log: visiting a landmark unlocks a card with sourced facts; map teleport to discovered places
-- [ ] 5.6 Activities framework + ≥ 5 activities (rickshaw rides, farsan delivery, time trials, BRTS driver, kite fight / garba)
-- [ ] 5.7 Money (₹) from activities; outfits and food
-- [ ] 5.8 Saves: position, vehicle, outfit, money, discoveries, records, settings; export/import JSON
+- [x] 5.1 Every vehicle drivable (bicycle, scooter, motorcycle, chhakdo, auto, hatchback, SUV, bus, tractor); take any traffic vehicle with E
+- [x] 5.2 Sandbox menu (Tab): spawn vehicles and props (cones, ramps, barrels, stumps); sliders for time, date/season, weather, traffic, people
+- [x] 5.3 Weather: clear, summer haze, monsoon rain with wet roads (rivers filling only in the monsoon: still to do)
+- [x] 5.4 Drone camera (free fly over the city) and photo mode (hide HUD, filters, depth of field)
+- [x] 5.5 Discovery log: visiting a landmark unlocks a card with sourced facts; map teleport to discovered places
+- [x] 5.6 Activities framework + 5 activities: rickshaw rides, farsan delivery, Race Course time trial, BRTS driver, Navratri garba
+- [ ] 5.7 Money (₹) from activities and discoveries (done); spend it on outfits and food (to do)
+- [x] 5.8 Saves: position, vehicle, outfit, money, discoveries, records, settings; export/import JSON
 - [ ] 5.9 Ambient audio (traffic hum, market chatter, temple bells, crickets) and signals at major junctions
 - [ ] 5.10 Review → gate (fun check)
 

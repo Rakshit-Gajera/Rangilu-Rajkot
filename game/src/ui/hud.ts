@@ -14,6 +14,7 @@ export class Hud {
     speed: document.getElementById('speed')!,
     prompt: document.getElementById('prompt')!,
     perf: document.getElementById('perf')!,
+    money: document.getElementById('money')!,
   };
   private lastArea = '';
   private areaTimer = 0;
@@ -56,6 +57,11 @@ export class Hud {
 
   setClock(label: string) {
     this.el.clock.textContent = label;
+  }
+
+  setMoney(rupees: number) {
+    const t = `₹${rupees.toLocaleString('en-IN')}`;
+    if (this.el.money.textContent !== t) this.el.money.textContent = t;
   }
 
   setSpeed(kmh: number | null) {

@@ -86,6 +86,25 @@ export class Audio {
     }
   }
 
+  /** Short UI cues for activities: ding (checkpoint), good (paid), bad (late). */
+  chime(kind: 'ding' | 'good' | 'bad') {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const notes = kind === 'ding' ? [988] : kind === 'good' ? [659, 784, 988] : [330, 262];
+    notes.forEach((f, k) => {
+      const t = ctx.currentTime + k * 0.09;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.15, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.32);
+    });
+  }
+
   private rain: GainNode | null = null;
 
   /** Monsoon rain: looping filtered noise, level 0..1. */
