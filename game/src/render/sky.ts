@@ -184,6 +184,7 @@ export class Environment {
     const golden = (1 - THREE.MathUtils.smoothstep(alt, 0.03, 0.4)) * THREE.MathUtils.smoothstep(alt, -0.06, 0.02);
     worldUniforms.uNight.value = THREE.MathUtils.smoothstep(1 - day, 0.3, 1);
     worldUniforms.uHour.value = clock.hours;
+    worldUniforms.uTime.value = performance.now() / 1000;
 
     const u = this.dome.material.uniforms;
     u.uZenith.value.copy(this.zen);

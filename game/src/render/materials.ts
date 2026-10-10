@@ -5,6 +5,7 @@ export const worldUniforms = {
   uNight: { value: 0 }, // 0 day .. 1 full night
   uHour: { value: 18.5 }, // local time, hours
   uWet: { value: 0 }, // 0 dry .. 1 soaked (monsoon rain, render/weather.ts)
+  uTime: { value: 0 }, // seconds, for moving water
   uRiver: { value: 0 }, // 0 dry riverbeds .. 1 rivers flowing (monsoon months or heavy rain)
 };
 
@@ -251,8 +252,36 @@ export function grassMaterial(): THREE.MeshStandardMaterial {
   return m;
 }
 
+/** Lakes: a deep green-blue with moving ripples (perturbed normals) that catch the sky and the sun. */
 export function waterMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: 0x3d5a5c, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.92 });
+  const m = new THREE.MeshStandardMaterial({ color: 0x35565a, roughness: 0.06, metalness: 0.15, transparent: true, opacity: 0.93 });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = worldUniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vWorldW;`)
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+vWorldW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vWorldW; uniform float uTime;`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  {
+    vec2 p = vWorldW.xz;
+    float t = uTime;
+    // Several wave trains at odd angles and scales: no visible grid.
+    vec2 g = vec2(0.0);
+    g += vec2(0.8, 0.6) * cos(dot(p, vec2(0.8, 0.6)) * 0.37 + t * 1.3);
+    g += vec2(-0.5, 0.87) * cos(dot(p, vec2(-0.5, 0.87)) * 0.53 + t * 1.7);
+    g += vec2(0.97, -0.26) * cos(dot(p, vec2(0.97, -0.26)) * 0.91 + t * 2.1) * 0.6;
+    g += vec2(-0.2, -0.98) * cos(dot(p, vec2(-0.2, -0.98)) * 1.7 + t * 2.9) * 0.35;
+    g *= 0.03;
+    vec3 nW = normalize(vec3(-g.x, 1.0, -g.y));
+    normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+  }`);
+  };
+  m.customProgramCacheKey = () => 'water-v2';
+  return m;
 }
 
 /** Riverbeds (Aji, Nyari): dry sand most of the year, muddy flowing water in the monsoon (uRiver). */

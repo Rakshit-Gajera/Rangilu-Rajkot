@@ -8,7 +8,7 @@ import { box, segment, sphere } from './prims';
 export const MODELS = [
   'scooter', 'motorcycle', 'auto', 'chhakdo', 'car-white', 'car-red', 'car-silver', 'car-blue', 'bus',
   'ped-kurta', 'ped-shirt', 'ped-saree', 'ped-salwar', 'cow-stand', 'cow-sit',
-  'bicycle', 'suv-white', 'suv-black', 'tractor',
+  'bicycle', 'suv-white', 'suv-black', 'tractor', 'dog-lie', 'dog-walk',
 ] as const;
 export type ModelName = (typeof MODELS)[number];
 
@@ -48,6 +48,23 @@ function person(b: Builder, top: number[], bottom: number[], dress: 'pants' | 's
   sphere(b, [0, 1.6, 0.01], 0.11, SKIN, 1.1, 8);
   sphere(b, [0, 1.65, -0.01], 0.115, HAIR, 0.65, 8);
   for (const s of [-1, 1]) segment(b, [s * 0.2, 1.4, 0], [s * 0.23, 0.95, 0.02], 0.05, 0.04, top, 6);
+}
+
+/** Indian street dog (desi): tan or brown-and-white, lying in the shade or trotting. */
+function dog(b: Builder, lying: boolean, coat: number[]) {
+  const W = [0.92, 0.88, 0.8];
+  const y = lying ? 0.18 : 0.42;
+  segment(b, [0, y, -0.32], [0, y + 0.02, 0.3], 0.13, 0.12, coat, 8); // body
+  segment(b, [0, y + 0.08, 0.32], [0, y + (lying ? 0.12 : 0.26), 0.48], 0.07, 0.06, coat, 6); // neck
+  sphere(b, [0, y + (lying ? 0.14 : 0.3), 0.52], 0.09, coat, 1, 8); // head
+  segment(b, [0, y + (lying ? 0.12 : 0.28), 0.58], [0, y + (lying ? 0.1 : 0.26), 0.7], 0.045, 0.03, W, 6); // muzzle
+  for (const s of [-1, 1]) segment(b, [s * 0.05, y + (lying ? 0.2 : 0.36), 0.5], [s * 0.07, y + (lying ? 0.3 : 0.46), 0.48], 0.03, 0.01, coat, 4); // ears
+  segment(b, [0, y + 0.04, -0.34], [0, y + (lying ? 0.06 : 0.25), -0.56], 0.03, 0.015, coat, 4); // tail
+  if (lying) {
+    for (const s of [-1, 1]) segment(b, [s * 0.08, 0.06, 0.32], [s * 0.08, 0.05, 0.55], 0.03, 0.025, coat, 4);
+  } else {
+    for (const [x, z] of [[-0.07, 0.24], [0.07, 0.24], [-0.07, -0.26], [0.07, -0.26]]) segment(b, [x, y - 0.06, z], [x, 0.01, z], 0.035, 0.028, coat, 5);
+  }
 }
 
 function cow(b: Builder, sitting: boolean) {
@@ -175,6 +192,8 @@ export function vehicleModel(name: ModelName, options: ModelOptions = {}): GeoBu
     case 'ped-salwar': person(b, [0.95, 0.65, 0.15], [0.3, 0.55, 0.45], 'salwar'); break;
     case 'cow-stand': cow(b, false); break;
     case 'cow-sit': cow(b, true); break;
+    case 'dog-lie': dog(b, true, [0.72, 0.52, 0.3]); break;
+    case 'dog-walk': dog(b, false, [0.55, 0.36, 0.2]); break;
   }
   const out = b.build();
   const c = out.attrs.color[0];

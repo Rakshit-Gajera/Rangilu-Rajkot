@@ -596,9 +596,14 @@ async function main() {
     // Something to get on: a parked vehicle of ours, or one from traffic (PROMPT §3.3: take any vehicle).
     const nearV = drivingV ? null : garage.nearest(player.position);
     const nearTraffic = !drivingV && !nearV && !!life?.vehicleNear(player.position.x, -player.position.z);
+    const nearAnimal = !drivingV && !nearV && !nearTraffic ? life?.animalNear(player.position.x, -player.position.z) ?? null : null;
     if (controls && input.hit('KeyE')) {
       if (drivingV) exitVehicle();
-      else if (nearV) enterVehicle(nearV);
+      else if (nearAnimal) {
+        // Pet the cow / dog (PROMPT §3.2).
+        hud.flash(nearAnimal === 'cow' ? 'You gently pat the cow. She does not mind. 🐄' : 'The dog wags its tail. Good boy! 🐕');
+        audio.chime('good');
+      } else if (nearV) enterVehicle(nearV);
       else if (nearTraffic && life) {
         const t = life.takeVehicle(player.position.x, -player.position.z);
         const kind = t ? kindOfModel(t.model) : null;
@@ -732,7 +737,7 @@ async function main() {
     hud.setSpeed(drivingV ? Math.abs(drivingV.speed) * 3.6 : null);
     if (!traveling) {
       hud.setPrompt(nearV ? `E — ${nearV.spec.twoWheeler ? 'ride' : 'drive'} the ${nearV.spec.label.toLowerCase()}`
-        : nearTraffic ? 'E — take this vehicle' : '');
+        : nearTraffic ? t('take') : nearAnimal ? `E — pet the ${nearAnimal}` : '');
     }
     hud.updateArea(p.x, -p.z, dt);
     worst.hud = Math.max(worst.hud, performance.now() - tHud);

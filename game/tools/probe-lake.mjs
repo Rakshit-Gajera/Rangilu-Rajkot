@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 720, height: 450 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+await p.goto('http://localhost:5173/?shadows=0&dynres=0&quality=medium&date=2026-10-09&hour=17.3&save=0');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 180000 });
+const [x, n] = [4777, -3637];
+await p.evaluate(([x, n]) => window.__game.setView([x - 250, 90, -n - 250], [x, 25, -n], 17.3), [x, n]);
+await p.evaluate(([x, n]) => window.__game.ensure(x - 150, -n - 150, 400), [x, n]);
+await p.waitForTimeout(4000);
+await p.screenshot({ path: '../shots/102-aji-lake.png' });
+await b.close();

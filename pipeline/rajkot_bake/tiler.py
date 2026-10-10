@@ -188,7 +188,16 @@ def run(cfg: C.Config) -> None:
         tbox = box(sw[0], sw[1], sw[0] + ts, sw[1] + ts)
         sections = []
 
-        hb = terrain.block(*sw)
+        hb = terrain.block(*sw).copy()
+        # Lakes: the elevation model is flat at the water surface; carve the bed 1.2 m below the lake level
+        # so the water shows (and you wade in rather than walk on it).
+        lakes_here = [int(k) for k in water_tree.query(tbox) if not water.river.values[int(k)]]
+        if lakes_here:
+            gx, gy = np.meshgrid(sw[0] + np.arange(N_H) * terrain.res, sw[1] + np.arange(N_H) * terrain.res)
+            for k in lakes_here:
+                inside = shapely.contains_xy(water.geometry.values[k], gx, gy)
+                if inside.any():
+                    hb[inside] = np.minimum(hb[inside], water.level.values[k] + 100.0 - 1.2)
         sections.append((b"HGHT", struct.pack("<H", N_H) + dm(hb - 100.0).tobytes()))
 
         keep = [k for k in by_tile[(i, j)] if k not in landmark_drop]

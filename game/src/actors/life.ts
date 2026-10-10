@@ -178,7 +178,9 @@ export class Life {
       v0 = 0;
       sp.s = this.rand() * this.graph.edgeLength(sp.edge); // anywhere along the street
     } else {
-      model = MODELS.indexOf(this.rand() < 0.6 ? 'cow-sit' : 'cow-stand');
+      // Cows, and street dogs (lying in the shade or trotting along).
+      const r = this.rand();
+      model = MODELS.indexOf(r < 0.35 ? 'cow-sit' : r < 0.6 ? 'cow-stand' : r < 0.82 ? 'dog-lie' : 'dog-walk');
       lane = (this.rand() < 0.5 ? 1 : -1) * Math.max(0.8, half - 0.6 + this.rand() * 0.6);
       v0 = 0.4;
     }
@@ -299,7 +301,8 @@ export class Life {
         if (a.wait < 0) a.wait = 8 + this.rand() * 20;
       } else {
         a.wait -= dt;
-        a.v = a.model === MODELS.indexOf('cow-stand') && a.wait < 4 && a.wait > 0 ? 0.35 : 0;
+        const m = MODELS[a.model];
+        a.v = m === 'dog-walk' ? (a.wait > 6 ? 1.1 : 0) : m === 'cow-stand' && a.wait < 4 && a.wait > 0 ? 0.35 : 0;
         if (a.wait < 0) a.wait = 10 + this.rand() * 30;
       }
       a.s += a.v * dt;
@@ -351,6 +354,17 @@ export class Life {
     return { vehicles, peds };
   }
 
+  /** The nearest cow or dog within r metres, for petting (E). */
+  animalNear(x: number, n: number, r = 2.2): 'cow' | 'dog' | null {
+    let best: Agent | null = null, bd = r;
+    for (const a of this.agents) {
+      if (a.kind !== 'cow') continue;
+      const d = Math.hypot(a.x - x, a.n - n);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return best ? (MODELS[best.model].startsWith('dog') ? 'dog' : 'cow') : null;
+  }
+
   /** Is a traffic vehicle within reach (for the E prompt)? */
   vehicleNear(x: number, n: number, reach = 1.5): boolean {
     return this.agents.some((a) => a.kind === 'vehicle' && Math.hypot(a.x - x, a.n - n) - a.length / 2 < reach);
@@ -387,7 +401,7 @@ export class Life {
 
   /** Kinematic colliders only for agents near the player (PROMPT §9.4). */
   private syncBody(a: Agent, px: number, pn: number) {
-    const near = Math.hypot(a.x - px, a.n - pn) < COLLIDER_RANGE && a.kind !== 'ped';
+    const near = Math.hypot(a.x - px, a.n - pn) < COLLIDER_RANGE && a.kind !== 'ped' && !MODELS[a.model].startsWith('dog');
     if (near && !a.body) {
       const R = this.physics.R;
       a.body = this.physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(a.x, a.y, -a.n));
