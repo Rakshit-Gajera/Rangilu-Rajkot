@@ -9,6 +9,8 @@ import { Physics } from './physics/physics';
 import { worldUniforms } from './render/materials';
 import { Clock, Environment, goldenHour } from './render/sky';
 import { Hud } from './ui/hud';
+import { CityMap } from './ui/map';
+import { RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
 
 const FACTS = [
@@ -74,6 +76,53 @@ async function main() {
   const audio = new Audio();
   const hud = new Hud(world);
   let riding = false;
+
+  // --- Map, GPS and fast travel (PROMPT §3.5, §9.8). The game still works if the map fails to load.
+  let graph: RoadGraph | null = null;
+  try {
+    graph = world.manifest.map ? await RoadGraph.load(`world/${world.manifest.map}`) : null;
+  } catch (e) {
+    console.warn('map unavailable', e);
+  }
+  let routeTimer = 0;
+  let traveling = false;
+  let travelTo: THREE.Vector3 | null = null; // streaming follows the destination while travelling
+  const here = () => (riding ? scooter.position : player.position);
+  async function fastTravel(x: number, n: number) {
+    if (traveling) return;
+    traveling = true;
+    hud.setPrompt('Travelling…');
+    // Land on the nearest road so you never appear inside a building.
+    if (graph) [x, n] = graph.nodeXY(graph.nearestNode(x, n, true));
+    travelTo = new THREE.Vector3(x, 0, -n);
+    await world.ensure(x, -n, 350);
+    const y = (world.terrainAt(x, -n) ?? 30) + 0.3;
+    if (riding) scooter.teleport(x, y, -n);
+    else player.teleport(x, y, -n);
+    routeTimer = 0;
+    travelTo = null;
+    traveling = false;
+  }
+  const cityMap = graph ? new CityMap(graph, {
+    player: () => { const p = here(); return { x: p.x, n: -p.z, heading: -follow.yaw }; },
+    onWaypoint: () => { routeTimer = 0; },
+    onClearWaypoint: () => { routeTimer = 0; },
+    onFastTravel: (x, n) => { void fastTravel(x, n); },
+  }) : null;
+  function updateRoute(dt: number) {
+    if (!graph || !cityMap?.waypoint) return;
+    routeTimer -= dt;
+    if (routeTimer > 0) return;
+    routeTimer = 1.5;
+    const p = here(), w = cityMap.waypoint;
+    if (Math.hypot(p.x - w.x, -p.z - w.n) < 30) {
+      cityMap.clearWaypoint();
+      hud.flash('You have arrived');
+      return;
+    }
+    const r = graph.route(p.x, -p.z, w.x, w.n);
+    cityMap.setRoute(r?.points ?? null, r?.length ?? 0);
+  }
   let showPerf = false;
   let fixedView: { pos: THREE.Vector3; look: THREE.Vector3 } | null = null;
 
@@ -94,8 +143,13 @@ async function main() {
     const tFrame = performance.now();
 
     // --- Input-driven actions -------------------------------------------------
+    const mapOpen = !!cityMap?.open;
+    if (mapOpen) {
+      for (const code of ['KeyM', 'Escape', 'KeyF', 'Delete', 'Backspace']) if (input.hit(code)) cityMap!.key(code);
+    } else if (input.hit('KeyM') && cityMap) cityMap.toggle(true);
+    const controls = mapOpen || traveling ? null : input;
     const near = scooter.position.distanceTo(player.position) < 2.6;
-    if (input.hit('KeyE')) {
+    if (controls && input.hit('KeyE')) {
       if (riding) {
         riding = false;
         scooter.setRider(null);
@@ -115,7 +169,7 @@ async function main() {
         follow.yaw = scooter.yaw() + Math.PI;
       }
     }
-    if (!riding && input.hit('Space')) player.requestJump();
+    if (controls && !riding && input.hit('Space')) player.requestJump();
     if (input.hit('KeyH')) audio.horn();
     if (input.hit('KeyT')) clock.hours = (clock.hours + 1) % 24;
     if (input.hit('KeyR') && riding) scooter.resetUpright();
@@ -124,8 +178,8 @@ async function main() {
     // --- Fixed-step simulation --------------------------------------------------
     acc += dt;
     while (acc >= STEP) {
-      scooter.drive(riding ? input : null, STEP);
-      if (!riding) player.update(input, follow, STEP);
+      scooter.drive(riding ? controls : null, STEP);
+      if (!riding && controls) player.update(controls, follow, STEP);
       physics.step();
       player.capture();
       scooter.capture();
@@ -150,7 +204,7 @@ async function main() {
     env.update(clock, fixedView ? fixedView.look : focus, camera);
     {
       const v = riding ? scooter.chassis.linvel() : { x: 0, z: 0 };
-      const p = fixedView ? fixedView.pos : riding ? scooter.position : player.position;
+      const p = fixedView ? fixedView.pos : travelTo ?? (riding ? scooter.position : player.position);
       world.update(p.x, p.z, v.x, v.z, fixedView ? 50 : 4);
     }
     const res = dynres.sample(dt);
@@ -159,10 +213,12 @@ async function main() {
 
     // --- HUD ----------------------------------------------------------------------
     const p = riding ? scooter.position : player.position;
-    hud.drawMinimap(p.x, -p.z, follow.yaw);
+    updateRoute(dt);
+    hud.drawMinimap(p.x, -p.z, follow.yaw, cityMap?.index ?? null, cityMap?.route ?? null, cityMap?.waypoint ?? null);
+    if (cityMap?.open) cityMap.draw();
     hud.setClock(clock.label());
     hud.setSpeed(riding ? Math.abs(scooter.speed) * 3.6 : null);
-    hud.setPrompt(!riding && near ? 'E — ride the scooter' : '');
+    if (!traveling) hud.setPrompt(!riding && near ? 'E — ride the scooter' : '');
     hud.updateArea(p.x, -p.z, dt);
     if (riding) audio.setEngine(Math.min(Math.abs(scooter.speed) / 24, 1));
     frameTimes.push(performance.now() - tFrame);

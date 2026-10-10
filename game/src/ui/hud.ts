@@ -1,9 +1,7 @@
 import type { World } from '../world/world';
+import { drawArrow, drawPin, drawRoads, drawRoute, toScreen, type EdgeIndex, type View } from './mapdraw';
 
 const RADIUS_M = 300; // minimap radius (PROMPT §9.8)
-const ROAD_STYLE: Record<number, [string, number]> = {
-  9: ['#f59e0b', 4], 8: ['#f59e0b', 4], 7: ['#fbbf24', 3.5], 6: ['#fde68a', 3], 5: ['#e5e7eb', 2.4],
-};
 
 /** HUD: rotating vector minimap, clock, speed, area name, prompts (plain DOM + canvas). */
 export class Hud {
@@ -25,8 +23,10 @@ export class Hud {
   }
 
   /** x, n in world metres (n = north); heading = camera yaw (radians, 0 = looking north). */
-  drawMinimap(x: number, n: number, yaw: number) {
-    const c = this.ctx, W = this.mm.width, s = W / 2 / RADIUS_M;
+  drawMinimap(x: number, n: number, yaw: number, roads: EdgeIndex | null, route: number[] | null,
+    waypoint: { x: number; n: number } | null) {
+    const c = this.ctx, W = this.mm.width;
+    const v: View = { cx: x, cn: n, scale: W / 2 / RADIUS_M, rot: yaw, w: W, h: W };
     c.save();
     c.clearRect(0, 0, W, W);
     c.beginPath();
@@ -34,43 +34,17 @@ export class Hud {
     c.clip();
     c.fillStyle = 'rgba(28,26,24,0.82)';
     c.fillRect(0, 0, W, W);
-    c.translate(W / 2, W / 2);
-    c.rotate(yaw); // map rotates so the view direction points up
-    c.lineCap = 'round';
-    c.lineJoin = 'round';
-    for (const pass of [0, 1]) {
-      for (const t of this.world.tiles.values()) {
-        const b = t.build;
-        if (Math.abs(b.swx + 250 - x) > 800 || Math.abs(b.swn + 250 - n) > 800) continue;
-        for (const r of b.minimapRoads) {
-          const rank = r[0];
-          const major = rank >= 5;
-          if ((pass === 0) === major) continue;
-          const [col, w] = ROAD_STYLE[rank] ?? ['#9ca3af', 1.6];
-          c.strokeStyle = col;
-          c.lineWidth = w;
-          c.beginPath();
-          for (let k = 1; k < r.length; k += 2) {
-            const px = (r[k] - x) * s, py = -(r[k + 1] - n) * s;
-            k === 1 ? c.moveTo(px, py) : c.lineTo(px, py);
-          }
-          c.stroke();
-        }
-      }
+    if (roads) drawRoads(c, roads, v, 2, 1);
+    drawRoute(c, v, route, 4);
+    if (waypoint) {
+      // Clamp the pin to the rim when it is off the minimap.
+      let [px, py] = toScreen(v, waypoint.x, waypoint.n);
+      const dx = px - W / 2, dy = py - W / 2, d = Math.hypot(dx, dy), max = W / 2 - 14;
+      if (d > max) { px = W / 2 + (dx / d) * max; py = W / 2 + (dy / d) * max; }
+      drawPin(c, px, py);
     }
     c.restore();
-    // Player arrow (always pointing up).
-    c.fillStyle = '#ef4444';
-    c.strokeStyle = '#fff';
-    c.lineWidth = 1.5;
-    c.beginPath();
-    c.moveTo(W / 2, W / 2 - 9);
-    c.lineTo(W / 2 + 6, W / 2 + 7);
-    c.lineTo(W / 2, W / 2 + 3);
-    c.lineTo(W / 2 - 6, W / 2 + 7);
-    c.closePath();
-    c.fill();
-    c.stroke();
+    drawArrow(c, W / 2, W / 2, 0);
     // North marker on the rim.
     const nx = W / 2 + Math.sin(yaw) * (W / 2 - 12), ny = W / 2 - Math.cos(yaw) * (W / 2 - 12);
     c.fillStyle = '#fff';
@@ -86,6 +60,15 @@ export class Hud {
 
   setSpeed(kmh: number | null) {
     this.el.speed.textContent = kmh === null ? '' : `${Math.round(kmh)} km/h`;
+  }
+
+  /** Big centred message for a few seconds (re-uses the area-name banner). */
+  flash(text: string) {
+    this.lastArea = text;
+    this.el.area.textContent = text;
+    this.el.area.classList.remove('show');
+    void this.el.area.offsetWidth;
+    this.el.area.classList.add('show');
   }
 
   setPrompt(text: string) {

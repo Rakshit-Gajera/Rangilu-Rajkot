@@ -39,3 +39,21 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color:
   #minimap { width: 140px; height: 140px; left: 10px; bottom: 10px; }
   #help { display: none; }
 }
+
+/* Full city map (M) */
+#citymap { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-columns: 1fr 280px; background: #1c1917; }
+#citymap[hidden] { display: none; }
+#citymap canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#citymap aside { padding: 16px; overflow: auto; background: rgba(12, 10, 9, 0.92); border-left: 1px solid #44403c; }
+#citymap h2 { margin: 0 0 6px; color: #ffd28a; font-size: 22px; }
+#citymap h2 span { font-family: 'Noto Sans Gujarati', sans-serif; font-weight: 400; margin-left: 6px; }
+#citymap h3 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #a8a29e; }
+#citymap .hint { font-size: 12px; line-height: 1.5; color: #d6d3d1; margin: 0; }
+#map-route { color: #d8b4fe; font-weight: 600; min-height: 1.2em; }
+#map-places { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+#map-places li { padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+#map-places li:hover { background: #292524; }
+@media (max-width: 700px) {
+  #citymap { grid-template-columns: 1fr; grid-template-rows: 1fr 38vh; }
+  #citymap aside { border-left: 0; border-top: 1px solid #44403c; }
+}

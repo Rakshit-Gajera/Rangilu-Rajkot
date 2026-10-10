@@ -101,3 +101,28 @@ test('walks and rides the scooter without falling through the world', async ({ p
   await page.keyboard.up('KeyW');
   expect(ride.pos[1]).toBeGreaterThan(s.pos[1] - 5);
 });
+
+test('map: waypoint, GPS route and fast travel to Rajkot Junction', async ({ page }) => {
+  await page.goto('/?shadows=0&date=2026-10-09');
+  await page.waitForFunction(() => (window as any).__game?.ready, null, { timeout: 120_000 });
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('#citymap')).toBeVisible();
+  await page.locator('#map-places li', { hasText: 'Rajkot Junction' }).click();
+  await expect(page.locator('#map-route')).toContainText('km', { timeout: 10_000 });
+  const km = parseFloat((await page.locator('#map-route').textContent())!.replace(/[^\d.]/g, ''));
+  expect(km).toBeGreaterThan(1.8);
+  expect(km).toBeLessThan(5);
+  mkdirSync(OUT, { recursive: true });
+  await page.screenshot({ path: `${OUT}/20-map-route.png` });
+  await page.keyboard.press('KeyF');
+  await expect(page.locator('#citymap')).toBeHidden();
+  await page.waitForFunction(() => {
+    const p = (window as any).__game.player();
+    return Math.hypot(p[0] - 49, -p[2] - 1945) < 150;
+  }, null, { timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  const p = await page.evaluate(() => (window as any).__game.player());
+  const ground = await page.evaluate(([x, z]) => (window as any).__game.terrain(x, z), [p[0], p[2]]);
+  expect(Math.abs(p[1] - ground)).toBeLessThan(3); // standing on the ground, not inside or under it
+  await page.screenshot({ path: `${OUT}/21-after-fast-travel.png` });
+});

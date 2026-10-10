@@ -21,6 +21,7 @@ STAGES = {
     "terrain": "terrain",
     "roadstats": "roads_raw",
     "tiles": "tiler",
+    "globals": "globals",
     "report": "report",
 }
 

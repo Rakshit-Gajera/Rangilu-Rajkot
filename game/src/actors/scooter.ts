@@ -121,6 +121,15 @@ export class Scooter {
     }
   }
 
+  teleport(x: number, y: number, z: number) {
+    this.chassis.setTranslation({ x, y: y + 0.6, z }, true);
+    this.chassis.setRotation(quatY(this.yaw()), true);
+    this.chassis.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.capture();
+    this.capture();
+  }
+
   resetUpright() {
     const t = this.chassis.translation();
     const yaw = this.yaw();
