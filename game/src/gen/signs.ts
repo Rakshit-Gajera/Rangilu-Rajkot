@@ -46,7 +46,7 @@ export interface SignMeshes {
 }
 
 export const ATLAS_COLS = 4;
-export const ATLAS_ROWS = 16;
+export const ATLAS_ROWS = 32;
 export const MAX_SIGNS = ATLAS_COLS * ATLAS_ROWS;
 
 export function shopName(seed: number): SignSpec {

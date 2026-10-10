@@ -313,6 +313,7 @@ async function main() {
     quality: () => quality.name,
     route: (x0: number, n0: number, x1: number, n1: number) => graph?.route(x0, n0, x1, n1)?.points ?? null,
     worldStats: () => world.stats(),
+    debugScene: () => { const out: Record<string, number> = {}; scene.traverse((o) => { const mm = o as THREE.Mesh; if (mm.isMesh) { const k = (mm.material as THREE.Material).type + ((mm.material as THREE.MeshStandardMaterial).map ? ":map" : "") + (mm.visible ? "" : ":hidden") + ((mm.material as THREE.MeshStandardMaterial).map ? "@" + mm.parent?.name : ""); out[k] = (out[k] ?? 0) + 1; } }); return out; },
     roadNear: (x: number, n: number) => (graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n]),
     idle: () => world.stats().queued === 0,
     heap: () => (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0,

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ATLAS_COLS, ATLAS_ROWS, type SignSpec } from '../gen/signs';
 import { worldUniforms } from './materials';
 
-const CELL_W = 256, CELL_H = 64;
+const CELL_W = 256, CELL_H = 32; // 4 × 32 cells in a 1024² texture: up to 128 boards per tile
 
 /** Draw a tile's signboards into one texture: English name on top, Gujarati below (PROMPT §7.10). */
 export function signAtlas(specs: SignSpec[]): THREE.CanvasTexture {
@@ -15,13 +15,13 @@ export function signAtlas(specs: SignSpec[]): THREE.CanvasTexture {
     ctx.fillStyle = s.bg;
     ctx.fillRect(x, y, CELL_W, CELL_H);
     ctx.strokeStyle = s.fg;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 3, y + 3, CELL_W - 6, CELL_H - 6);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 2, y + 2, CELL_W - 4, CELL_H - 4);
     ctx.fillStyle = s.fg;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    fit(ctx, s.en.toUpperCase(), '700', 'Noto Sans, sans-serif', 22, x + CELL_W / 2, y + 22, CELL_W - 16);
-    fit(ctx, s.gu, '600', '"Noto Sans Gujarati", sans-serif', 20, x + CELL_W / 2, y + 46, CELL_W - 16);
+    fit(ctx, s.en.toUpperCase(), '700', 'Noto Sans, sans-serif', 12, x + CELL_W / 2, y + 10, CELL_W - 12);
+    fit(ctx, s.gu, '600', '"Noto Sans Gujarati", sans-serif', 12, x + CELL_W / 2, y + 23, CELL_W - 12);
   });
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
