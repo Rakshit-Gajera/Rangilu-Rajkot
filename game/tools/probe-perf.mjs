@@ -10,7 +10,7 @@ await p.waitForTimeout(25000);
 const r = await p.evaluate(() => {
   const g = window.__game;
   const ft = g.frameTimes(); ft.sort((a, b) => a - b);
-  return { life: g.life(), stats: g.stats(), worst: g.worst(), p50: ft[ft.length >> 1], p95: ft[Math.floor(ft.length * 0.95)], lifeMs: g.lifeMs?.(), avg: g.avg?.() };
+  return { life: g.life(), stats: g.stats(), worst: g.worst(), p50: ft[ft.length >> 1], p95: ft[Math.floor(ft.length * 0.95)], lifeMs: g.lifeMs?.(), avg: g.avg?.(), envBuilds: g.envBuilds?.() };
 });
 console.log(JSON.stringify(r, null, 1));
 await b.close();

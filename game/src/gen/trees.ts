@@ -37,7 +37,7 @@ export function treeModel(species: number, bloom = false, lo = false): GeoBuf {
   const r = rng(1000 + species);
   const leaf = (base: number[], v = 0.12) => base.map((c) => c * (1 - v / 2 + r() * v));
   // Low-poly version for distant trees (no shadows): fewer sides on everything.
-  const blob = (c: V3, rad: number, col: number[], sy = 0.75) => sphere(b, c, rad, leaf(col), sy, lo ? 5 : 7);
+  const blob = (c: V3, rad: number, col: number[], sy = 0.75) => sphere(b, c, rad, leaf(col), sy, lo ? 5 : 9);
   const seg = (p0: V3, p1: V3, r0: number, r1: number, col: number[], sides: number, caps = true) =>
     segment(b, p0, p1, r0, r1, col, lo ? Math.max(3, sides - 3) : sides, caps);
   switch (SPECIES[species]) {
@@ -140,7 +140,14 @@ export function treeModel(species: number, bloom = false, lo = false): GeoBuf {
     }
   }
   const out = b.build();
-  const c = out.attrs.color[0];
-  for (let k = 0; k < c.length; k++) c[k] = Math.pow(c[k], 2.2); // sRGB -> linear
+  const c = out.attrs.color[0], n = out.normal, p = out.position;
+  let top = 0;
+  for (let k = 1; k < p.length; k += 3) top = Math.max(top, p[k]);
+  for (let k = 0; k < c.length; k += 3) {
+    // Self-shadowed canopy: undersides and the inner/lower crown darker, sunlit tops a touch warmer.
+    const facing = 0.55 + 0.45 * (n[k + 1] * 0.5 + 0.5);
+    const height = 0.75 + 0.25 * Math.min(1, p[k + 1] / Math.max(top, 1));
+    for (let q = 0; q < 3; q++) c[k + q] = Math.pow(c[k + q], 2.2) * facing * height; // sRGB -> linear, shaded
+  }
   return out;
 }

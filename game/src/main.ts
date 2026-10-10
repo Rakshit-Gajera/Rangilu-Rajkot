@@ -773,6 +773,7 @@ async function main() {
     worldStats: () => world.stats(),
     life: () => life?.stats() ?? null,
     lifeMs: () => lifeMs,
+    envBuilds: () => env.envBuilds,
     // Triangles by material for visible meshes inside the camera frustum, and those casting shadows.
     triBreakdown: () => {
       const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));

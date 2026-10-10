@@ -71,9 +71,12 @@ ${GLSL_COMMON}`)
   float grime = fNoise(vec2(u * 0.35, y * 0.25) + seed * 50.0);
   float streak = smoothstep(0.55, 1.0, fNoise(vec2(u * 1.7, 0.5 + seed * 13.0))) * smoothstep(roofH - 6.0, roofH, y);
   plaster *= 1.0 - 0.18 * grime - 0.22 * streak - 0.15 * smoothstep(0.8, 0.0, y);
+  // Fine stucco texture up close.
+  plaster *= 0.94 + 0.12 * fNoise(vec2(u, y) * 9.0 + seed);
   vec3 col = plaster;
   vec3 emis = vec3(0.0);
   float rough = 0.92;
+  float metal = 0.0;
   // Anti-aliasing: fade procedural detail by the pixel footprint on the wall (metres per pixel).
   float fw = max(fwidth(vFuv.x), fwidth(vFuv.y));
   float detail = 1.0 - smoothstep(0.03, 0.15, fw);  // bars, grilles, ribs, slats
@@ -132,8 +135,8 @@ ${GLSL_COMMON}`)
       // Glass-front commercial complex: continuous glazing bands per floor.
       float g = fBox(vec2(lu, lv), vec2(0.02, 0.18), vec2(0.98, 0.92));
       if (g > 0.5) {
-        col = mix(vec3(0.20, 0.32, 0.40), vec3(0.45, 0.6, 0.7), fHash(vec2(bay, floorIdx)) * 0.4);
-        rough = 0.12;
+        col = mix(vec3(0.16, 0.26, 0.32), vec3(0.35, 0.48, 0.56), fHash(vec2(bay, floorIdx)) * 0.4);
+        rough = 0.06; metal = 0.55; // reflective glazing: shows the sky
         float lit = step(fHash(vec2(bay + seed * 3.0, floorIdx)), 0.6);
         emis = vec3(0.9, 0.95, 1.0) * lit * uNight * 0.55;
       }
@@ -149,6 +152,9 @@ ${GLSL_COMMON}`)
         float slab = step(lv, 0.06);
         float bar = mix(0.4, step(0.6, fract(lu * 18.0)), detail);
         col = slab > 0.5 ? plaster * 0.8 : mix(col * 0.55, vec3(0.18, 0.18, 0.2), bar * step(0.1, lv));
+      } else if (front && lv > hi.y + 0.02 && lv < hi.y + 0.08 && lu > lo.x - 0.08 && lu < hi.x + 0.08) {
+        // Chajja: the concrete sunshade over Indian windows (lit top edge).
+        col = plaster * mix(1.12, 0.92, (lv - hi.y - 0.02) / 0.06);
       } else if (hasWin && w > 0.5) {
         float wst = fHash(vec2(seed * 5.0, 1.0));
         vec3 glass = vec3(0.24, 0.29, 0.34); // dusty glass reflecting the sky
@@ -158,12 +164,19 @@ ${GLSL_COMMON}`)
         } else if (wst < 0.4) {
           glass *= 1.0 - 0.6 * detail * max(step(0.85, fract((lu - lo.x) * 16.0)), step(0.85, fract((lv - lo.y) * 10.0))); // grille
         }
-        col = glass; rough = 0.25;
+        // Recessed window: shadow under the chajja and along the left reveal.
+        float shade = 1.0 - 0.45 * smoothstep(hi.y - 0.22, hi.y, lv) * (front ? 1.0 : 0.4) - 0.25 * (1.0 - smoothstep(lo.x, lo.x + 0.06, lu));
+        col = glass * shade; rough = 0.12; metal = wst < 0.6 && zi == 0 ? 0.0 : 0.35;
         float lit = step(fHash(vec2(bay * 7.0 + seed * 101.0, floorIdx * 3.0)), mix(0.55, 0.2, step(23.0, uHour) + step(uHour, 5.0)));
         vec3 lamp = fHash(vec2(bay, floorIdx + seed)) > 0.5 ? vec3(1.0, 0.78, 0.48) : vec3(0.82, 0.92, 1.0);
         emis = lamp * lit * uNight * 0.85;
       } else if (frame > 0.5 && hasWin) {
         col = plaster * 0.75;
+      }
+      // Floor ledge at each slab, with a shadow line beneath it.
+      if (!balcony || lv >= 0.38) {
+        if (lv < 0.035) col = plaster * 1.08;
+        else if (lv < 0.09) col *= mix(0.78, 1.0, (lv - 0.035) / 0.055);
       }
       // Split AC outdoor unit under some windows.
       if (front && fHash(vec2(bay * 3.3, seed + floorIdx)) > 0.82 && fBox(vec2(lu, lv), vec2(0.62, 0.06), vec2(0.86, 0.24)) > 0.5) {
@@ -177,7 +190,10 @@ ${GLSL_COMMON}`)
     }
   } else if (y >= roofH) {
     col = plaster * 0.95; // parapet band
+    if (y > roofH + 0.9) col = plaster * 1.1; // coping
   }
+  // Contact shadow where walls meet the ground.
+  col *= 0.72 + 0.28 * smoothstep(0.0, 1.2, y);
   if (kind > 1.5 && kind < 2.5) col *= 0.82; // shared walls exposed: unpainted, darker
   // Far away: blend window patterns to their average so facades don't shimmer.
   if (!solid && y > groundH && y < roofH && !isZ6) {
@@ -189,10 +205,12 @@ ${GLSL_COMMON}`)
   diffuseColor.rgb = pow(col, vec3(2.2)); // colours above are designed in sRGB`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
   roughnessFactor = rough;`)
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+  metalnessFactor = metal;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   totalEmissiveRadiance += pow(emis, vec3(2.2)) * 0.55; // emissive also designed in sRGB; kept below tone-map white`);
   };
-  m.customProgramCacheKey = () => 'facade-v1';
+  m.customProgramCacheKey = () => 'facade-v2';
   return m;
 }
 
@@ -212,7 +230,7 @@ varying float vSurface; varying vec2 vWuv; uniform float uWet;
 ${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   int s = int(vSurface + 0.5);
-  vec3 c = s == 0 ? vec3(0.33, 0.33, 0.34) : (s == 1 ? vec3(0.66, 0.65, 0.62) : (s == 2 ? vec3(0.50, 0.34, 0.28) : vec3(0.52, 0.42, 0.30)));
+  vec3 c = s == 0 ? vec3(0.40, 0.39, 0.38) : (s == 1 ? vec3(0.66, 0.65, 0.62) : (s == 2 ? vec3(0.50, 0.34, 0.28) : vec3(0.52, 0.42, 0.30)));
   float n1 = fNoise(vWuv * 0.35), n2 = fNoise(vWuv * 3.0), patchy = smoothstep(0.62, 0.7, fNoise(vWuv * 0.08 + 7.0));
   c *= 0.85 + 0.2 * n1 + 0.08 * n2;
   if (s == 0) c = mix(c, vec3(0.30, 0.29, 0.28), patchy * 0.8); // patch repairs
@@ -226,6 +244,7 @@ ${GLSL_COMMON}`)
   roughnessFactor = mix(roughnessFactor, 0.12, clamp(uWet * 0.75 + puddle, 0.0, 1.0));`);
   };
   m.customProgramCacheKey = () => 'road-v2';
+  m.envMapIntensity = 0.45; // dusty asphalt: less blue sky light, so roads stay grey in the shade
   return m;
 }
 
@@ -249,6 +268,7 @@ export function grassMaterial(): THREE.MeshStandardMaterial {
   diffuseColor.rgb = pow(mix(dry, lush, uWet), vec3(2.2));`);
   };
   m.customProgramCacheKey = () => 'grass-v2';
+  m.envMapIntensity = 0.6;
   return m;
 }
 

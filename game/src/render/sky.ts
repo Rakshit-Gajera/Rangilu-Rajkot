@@ -93,6 +93,7 @@ class SkyDome extends THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
         uZenith: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() },
         uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
         uSunColor: { value: new THREE.Color(1, 0.9, 0.7) }, uNight: { value: 0 },
+        uTime: { value: 0 }, uCover: { value: 0.2 }, uDark: { value: 0 },
       },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
@@ -102,21 +103,51 @@ class SkyDome extends THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
           gl_Position = p.xyww; // at the far plane
         }`,
       fragmentShader: /* glsl */ `
-        uniform vec3 uZenith, uHorizon, uSunDir, uMoonDir, uSunColor; uniform float uNight;
+        uniform vec3 uZenith, uHorizon, uSunDir, uMoonDir, uSunColor; uniform float uNight, uTime, uCover, uDark;
         varying vec3 vDir;
         float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+        float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float n2(vec2 p) {
+          vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(h2(i), h2(i + vec2(1, 0)), f.x), mix(h2(i + vec2(0, 1)), h2(i + vec2(1, 1)), f.x), f.y);
+        }
+        float fbm(vec2 p) {
+          float v = 0.0, a = 0.5;
+          for (int k = 0; k < 5; k++) { v += a * n2(p); p = mat2(1.6, 1.2, -1.2, 1.6) * p; a *= 0.5; }
+          return v;
+        }
         void main() {
           vec3 d = normalize(vDir);
           float h = max(d.y, 0.0);
-          vec3 col = mix(uHorizon, uZenith, pow(h, 0.45));
-          col = mix(col, uHorizon * 0.55, smoothstep(0.0, -0.25, d.y)); // below the horizon (hidden by haze)
+          // Sky: deeper blue overhead, a bright hazy band at the horizon (Saurashtra dust).
+          vec3 col = mix(uHorizon, uZenith, pow(h, 0.5));
+          col += uHorizon * 0.25 * exp(-h * 18.0);
+          col = mix(col, uHorizon * 0.55, smoothstep(0.0, -0.25, d.y));
           float s = max(dot(d, uSunDir), 0.0);
-          col += uSunColor * (pow(s, 600.0) * 30.0 + pow(s, 24.0) * 0.35 + pow(s, 4.0) * 0.12) * (1.0 - uNight * 0.9);
+          float day = 1.0 - uNight * 0.9;
+          // Sun disc, inner glow and a wide forward-scattering halo (stronger when the sun is low).
+          float low = 1.0 - smoothstep(0.0, 0.5, uSunDir.y);
+          col += uSunColor * (pow(s, 900.0) * 40.0 + pow(s, 60.0) * 0.6 + pow(s, 6.0) * (0.15 + 0.35 * low)) * day * (1.0 - 0.8 * uDark);
           float m = max(dot(d, uMoonDir), 0.0);
           col += vec3(0.85, 0.9, 1.0) * (step(0.99965, m) * 1.2 + pow(m, 80.0) * 0.06) * uNight;
           vec3 cell = floor(d * 280.0);
-          float star = step(0.9975, hash(cell)) * smoothstep(0.05, 0.3, d.y) * uNight;
+          float star = step(0.9975, hash(cell)) * smoothstep(0.05, 0.3, d.y) * uNight * (1.0 - uCover);
           col += vec3(star) * (0.6 + 0.4 * hash(cell + 3.0));
+          // Clouds: two fbm layers projected on a sky plane, drifting with the wind; lit from the sun side.
+          if (d.y > 0.0) {
+            vec2 uv = d.xz / (d.y + 0.12) * 1.6;
+            vec2 wind = vec2(uTime * 0.006, uTime * 0.0025);
+            float c = fbm(uv + wind) * 0.7 + fbm(uv * 2.3 - wind * 1.7) * 0.3;
+            float cover = mix(0.62, 0.32, uCover);
+            float dens = smoothstep(cover, cover + 0.28, c);
+            dens *= smoothstep(0.0, 0.18, d.y); // thin out at the horizon
+            float lit = 0.55 + 0.45 * pow(s, 3.0);
+            vec3 sunlit = mix(vec3(1.0), uSunColor * 1.15, 0.35 + 0.4 * low);
+            vec3 cloudCol = mix(uHorizon * 0.75, sunlit, lit) * mix(1.0, 0.42, uDark);
+            cloudCol += uSunColor * pow(s, 14.0) * 0.8 * (1.0 - dens) * day; // silver lining
+            cloudCol = mix(cloudCol, vec3(0.05, 0.06, 0.09), uNight * 0.9);
+            col = mix(col, cloudCol, dens * 0.92);
+          }
           gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -137,8 +168,22 @@ export class Environment {
   private zen = new THREE.Color();
   private hor = new THREE.Color();
 
-  constructor(scene: THREE.Scene, private renderer: THREE.WebGLRenderer, shadowSize: number) {
+  // Image-based lighting: the sky rendered into a prefiltered environment map, refreshed every few seconds,
+  // so glass, paint, water and wet roads reflect the real sky and everything gets soft sky light.
+  private pmrem: THREE.PMREMGenerator;
+  private envScene = new THREE.Scene();
+  private envTarget: THREE.WebGLRenderTarget | null = null;
+  private envAt = -1e9;
+  private envSun = new THREE.Vector3();
+  private envWeather = 0;
+  envBuilds = 0;
+
+  constructor(private scene: THREE.Scene, private renderer: THREE.WebGLRenderer, shadowSize: number) {
     scene.add(this.dome, this.hemi);
+    this.pmrem = new THREE.PMREMGenerator(renderer);
+    const envDome = new THREE.Mesh(this.dome.geometry, this.dome.material);
+    envDome.frustumCulled = false;
+    this.envScene.add(envDome);
     scene.fog = this.fog;
     this.sun.castShadow = shadowSize > 0;
     if (shadowSize > 0) {
@@ -193,6 +238,9 @@ export class Environment {
     u.uMoonDir.value.copy(this.moonDir);
     u.uSunColor.value.setRGB(1, 0.85 - golden * 0.3, 0.65 - golden * 0.4).multiplyScalar(1 - 0.9 * this.overcast);
     u.uNight.value = night;
+    u.uTime.value = performance.now() / 1000;
+    u.uCover.value = Math.min(1, 0.25 + 0.75 * this.overcast - 0.2 * this.haze);
+    u.uDark.value = this.overcast;
     this.dome.position.copy(camera.position);
 
     // Key light: the sun (kept just above the horizon while it fades), or a dim moon.
@@ -207,8 +255,9 @@ export class Environment {
       this.sun.color.setRGB(0.55, 0.65, 1.0);
       this.sun.intensity = 0.35 * THREE.MathUtils.smoothstep(mp.altitude, 0.05, 0.4);
     } else {
-      this.sun.color.setRGB(1, 0.93 - golden * 0.28, 0.84 - golden * 0.45);
-      this.sun.intensity = 3.0 * day * (1 - 0.8 * this.overcast) * (1 - 0.3 * this.haze);
+      this.sun.color.setRGB(1, 0.93 - golden * 0.3, 0.84 - golden * 0.5);
+      // Low sun: strong, warm, raking light (the golden hour Rajkot is known for), unless clouded over.
+      this.sun.intensity = (3.0 * day + 1.8 * golden) * (1 - 0.8 * this.overcast) * (1 - 0.3 * this.haze);
     }
     // Sky light: strong blue-white by day, warm-violet at dusk, faint blue at night.
     this.hemi.color.copy(this.zen).lerp(this.hor, 0.45);
@@ -216,7 +265,22 @@ export class Environment {
     this.hemi.color.multiplyScalar(1 / peak); // colour only; brightness comes from intensity
     // Light bouncing up from dusty roads and plaster: near-neutral, so undersides (flyovers) read as grey concrete.
     this.hemi.groundColor.setRGB(0.6, 0.57, 0.52, THREE.SRGBColorSpace).multiplyScalar(0.3 + 0.7 * twilight);
-    this.hemi.intensity = (0.35 + 0.5 * twilight + 0.75 * day) * (1 + 0.25 * this.overcast);
+    // The environment map now carries most of the sky light; the hemisphere light just fills in.
+    this.hemi.intensity = (0.2 + 0.3 * twilight + 0.35 * day) * (1 + 0.25 * this.overcast);
+    const now = performance.now();
+    const weatherNow = this.overcast * 3 + this.haze;
+    if ((now - this.envAt > 20000 && this.envSun.distanceToSquared(this.sunDir) > 0.0004) || this.envSun.distanceToSquared(this.sunDir) > 0.01
+      || Math.abs(weatherNow - this.envWeather) > 0.15 || this.envAt < 0) {
+      this.envWeather = weatherNow;
+      this.envBuilds++;
+      this.envAt = now;
+      this.envSun.copy(this.sunDir);
+      const old = this.envTarget;
+      this.envTarget = this.pmrem.fromScene(this.envScene, 0.02, 0.1, 100, { size: 64 });
+      this.scene.environment = this.envTarget.texture;
+      this.scene.environmentIntensity = 0.55 + 0.2 * day;
+      old?.dispose();
+    }
 
     // Haze matches the horizon so distant buildings melt into the sky.
     this.fog.color.copy(this.hor);

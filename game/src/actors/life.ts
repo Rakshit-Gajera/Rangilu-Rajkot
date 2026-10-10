@@ -2,7 +2,7 @@ import type * as RAPIER from '@dimforge/rapier3d';
 import * as THREE from 'three';
 import { MODELS, vehicleModel, type ModelName } from '../gen/vehicles';
 import { GROUP_PLAYER, GROUP_VEHICLE, GROUP_WORLD, groups, type Physics } from '../physics/physics';
-import { vertexColorMaterial } from '../render/materials';
+import { vertexColorMaterial, worldUniforms } from '../render/materials';
 import type { RoadGraph } from '../world/roadgraph';
 import type { Signals } from '../world/signals';
 import type { World } from '../world/world';
@@ -54,9 +54,38 @@ const VEHICLES: Spec[] = [
   { model: 'tractor', weight: 1, length: 3.6, speed: 0.5, lane: 0.4 },
 ];
 const VEHICLE_TOTAL = VEHICLES.reduce((s, v) => s + v.weight, 0);
-const PEDS: ModelName[] = ['ped-kurta', 'ped-shirt', 'ped-saree', 'ped-salwar'];
+const PEDS: ModelName[] = ['ped-kurta', 'ped-shirt', 'ped-saree', 'ped-salwar', 'ped-saree', 'ped-elder', 'ped-student', 'ped-shirt'];
+
+/**
+ * People walk: limbs carry `swing` = [amplitude sign, pivot height]; each instance has its own phase
+ * (from its position) and `aMove` (0 when standing still).
+ */
+function walkingMaterial(): THREE.MeshStandardMaterial {
+  const m = vertexColorMaterial({ roughness: 0.75 });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = worldUniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute vec2 swing; attribute float aMove; uniform float uTime;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+if (swing.x != 0.0) {
+  float ph = dot(instanceMatrix[3].xz, vec2(0.37, 0.71));
+  float a = swing.x * sin(uTime * 6.5 + ph) * 0.42 * aMove;
+  float py = swing.y;
+  float c = cos(a), s = sin(a);
+  vec2 yz = vec2(transformed.y - py, transformed.z);
+  transformed.y = py + yz.x * c - yz.y * s;
+  transformed.z = yz.x * s + yz.y * c;
+}
+// A gentle bob while walking.
+transformed.y += aMove * abs(sin(uTime * 6.5 + dot(instanceMatrix[3].xz, vec2(0.37, 0.71)))) * 0.025;`);
+  };
+  m.customProgramCacheKey = () => 'walk-v1';
+  return m;
+}
 const SPAWN_MIN = 120, SPAWN_MAX = 550, DESPAWN = 650;
 const COLLIDER_RANGE = 40;
+const NEAR_LOD = 90; // |dx| + |dn|, metres: full-detail models closer than this
 
 /** Rajkot's day: busy mornings and evenings, the afternoon rest, quiet nights (PROMPT §3.4). */
 export function trafficDensity(hour: number): number {
@@ -97,23 +126,34 @@ export class Life {
     this.maxCows = caps.cows;
     this.maxParked = Math.round(caps.vehicles * 0.35);
     const mat = vertexColorMaterial({ roughness: 0.7 });
-    this.meshes = MODELS.map((name) => {
-      const g = vehicleModel(name);
+    const walkMat = walkingMaterial();
+    const make = (name: ModelName, lo: boolean) => {
+      const g = vehicleModel(name, { lo });
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
       geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
       geo.setAttribute('color', new THREE.BufferAttribute(g.attrs.color[0], 3));
       geo.setIndex(new THREE.BufferAttribute(g.index, 1));
-      const cap = name.startsWith('ped') ? caps.peds : name.startsWith('cow') ? caps.cows : caps.vehicles;
-      const mesh = new THREE.InstancedMesh(geo, mat, Math.max(cap, 1));
+      const ped = name.startsWith('ped');
+      const cap = ped ? caps.peds : name.startsWith('cow') || name.startsWith('dog') ? caps.cows : caps.vehicles;
+      if (ped) {
+        geo.setAttribute('swing', new THREE.BufferAttribute(g.attrs.swing[0], 2));
+        geo.setAttribute('aMove', new THREE.InstancedBufferAttribute(new Float32Array(Math.max(cap, 1)), 1));
+      }
+      const mesh = new THREE.InstancedMesh(geo, ped ? walkMat : mat, Math.max(cap, 1));
       mesh.count = 0;
       mesh.frustumCulled = false;
       mesh.castShadow = shadows;
       mesh.receiveShadow = shadows;
       scene.add(mesh);
       return mesh;
-    });
+    };
+    this.meshes = MODELS.map((name) => make(name, false));
+    this.farMeshes = MODELS.map((name) => make(name, true));
   }
+
+  /** Simplified copies of every model, used beyond NEAR_LOD metres. */
+  private farMeshes: THREE.InstancedMesh[];
 
   private rand() {
     this.rnd = (Math.imul(this.rnd, 1664525) + 1013904223) >>> 0;
@@ -180,7 +220,7 @@ export class Life {
     } else {
       // Cows, and street dogs (lying in the shade or trotting along).
       const r = this.rand();
-      model = MODELS.indexOf(r < 0.35 ? 'cow-sit' : r < 0.6 ? 'cow-stand' : r < 0.82 ? 'dog-lie' : 'dog-walk');
+      model = MODELS.indexOf(r < 0.3 ? 'cow-sit' : r < 0.45 ? 'cow-stand' : r < 0.6 ? 'cow-gir' : r < 0.82 ? 'dog-lie' : 'dog-walk');
       lane = (this.rand() < 0.5 ? 1 : -1) * Math.max(0.8, half - 0.6 + this.rand() * 0.6);
       v0 = 0.4;
     }
@@ -302,7 +342,7 @@ export class Life {
       } else {
         a.wait -= dt;
         const m = MODELS[a.model];
-        a.v = m === 'dog-walk' ? (a.wait > 6 ? 1.1 : 0) : m === 'cow-stand' && a.wait < 4 && a.wait > 0 ? 0.35 : 0;
+        a.v = m === 'dog-walk' ? (a.wait > 6 ? 1.1 : 0) : (m === 'cow-stand' || m === 'cow-gir') && a.wait < 4 && a.wait > 0 ? 0.35 : 0;
         if (a.wait < 0) a.wait = 10 + this.rand() * 30;
       }
       a.s += a.v * dt;
@@ -324,7 +364,7 @@ export class Life {
       }
       this.syncBody(a, px, pn);
     }
-    this.render();
+    this.render(px, pn);
   }
 
   /**
@@ -426,19 +466,31 @@ export class Life {
     this.agents.splice(k, 1);
   }
 
-  private render() {
+  private render(px: number, pn: number) {
     for (const m of this.meshes) m.count = 0;
+    for (const m of this.farMeshes) m.count = 0;
     const pos = new THREE.Vector3(), scl = new THREE.Vector3(1, 1, 1);
     for (const a of this.agents) {
-      const mesh = this.meshes[a.model];
+      const mesh = (Math.abs(a.x - px) + Math.abs(a.n - pn) < NEAR_LOD ? this.meshes : this.farMeshes)[a.model];
       if (mesh.count >= mesh.instanceMatrix.count) continue;
       // Model +z is forward; yaw is measured from north (−z in three.js).
       this.q.setFromAxisAngle(this.up, Math.PI - a.yaw);
       pos.set(a.x, a.y, -a.n);
       this.m.compose(pos, this.q, scl);
+      const move = mesh.geometry.getAttribute('aMove') as THREE.InstancedBufferAttribute | undefined;
+      if (move) move.setX(mesh.count, a.v > 0.2 ? 1 : 0);
       mesh.setMatrixAt(mesh.count++, this.m);
     }
-    for (const m of this.meshes) m.instanceMatrix.needsUpdate = true;
+    // Upload only the instances in use (most meshes are empty most of the time).
+    for (const m of [...this.meshes, ...this.farMeshes]) {
+      if (!m.count && !m.userData.had) continue;
+      m.userData.had = m.count > 0;
+      m.instanceMatrix.clearUpdateRanges();
+      m.instanceMatrix.addUpdateRange(0, Math.max(m.count, 1) * 16);
+      m.instanceMatrix.needsUpdate = true;
+      const move = m.geometry.getAttribute('aMove') as THREE.InstancedBufferAttribute | undefined;
+      if (move) { move.clearUpdateRanges(); move.addUpdateRange(0, Math.max(m.count, 1)); move.needsUpdate = true; }
+    }
   }
 
   stats() {
