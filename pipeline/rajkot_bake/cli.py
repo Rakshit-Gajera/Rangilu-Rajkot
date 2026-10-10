@@ -25,6 +25,7 @@ STAGES = {
     "tiles": "tiler",
     "globals": "globals",  # also run automatically by "tiles"
     "report": "report",
+    "private": "private",  # personal places from local.yaml -> world/private.local.json (never published)
 }
 
 

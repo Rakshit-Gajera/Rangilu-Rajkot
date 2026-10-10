@@ -8,6 +8,10 @@ export class FollowCamera {
   pitch = -0.18;
   distance = 4.5;
   firstPerson = false;
+  /** Settings: look speed multiplier, inverted vertical look, base field of view. */
+  sensitivity = 1;
+  invertY = false;
+  baseFov = 62;
   private current = 4.5;
   private target = new THREE.Vector3();
   private idle = 0;
@@ -23,8 +27,8 @@ export class FollowCamera {
       d = Math.atan2(Math.sin(d), Math.cos(d));
       this.yaw += d * (1 - Math.exp(-dt * 2.5));
     }
-    this.yaw -= input.mouseDX * 0.0025;
-    this.pitch = THREE.MathUtils.clamp(this.pitch - input.mouseDY * 0.0022, -1.2, 0.6);
+    this.yaw -= input.mouseDX * 0.0025 * this.sensitivity;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - input.mouseDY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1), -1.2, 0.6);
     if (input.wheel) this.distance = THREE.MathUtils.clamp(this.distance + input.wheel * 0.8, opts.minDist ?? 2.5, 14);
     if (input.hit('KeyC')) this.firstPerson = !this.firstPerson;
     this.target.lerp(focus, 1 - Math.exp(-dt * 18));
@@ -41,7 +45,7 @@ export class FollowCamera {
     this.current = want < this.current ? want : THREE.MathUtils.lerp(this.current, want, 1 - Math.exp(-dt * 4));
     this.camera.position.copy(this.target).addScaledVector(dir, this.current);
     this.camera.lookAt(this.target);
-    const fov = 62 + (opts.fovBoost ?? 0);
+    const fov = this.baseFov + (opts.fovBoost ?? 0);
     if (Math.abs(this.camera.fov - fov) > 0.05) {
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, fov, 1 - Math.exp(-dt * 3));
       this.camera.updateProjectionMatrix();

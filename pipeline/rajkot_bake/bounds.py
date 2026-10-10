@@ -14,6 +14,7 @@ import duckdb
 import geopandas as gpd
 import numpy as np
 import shapely
+import shapely.ops
 from pyproj import Transformer
 from scipy import ndimage
 from shapely.geometry import Point, box
@@ -99,6 +100,12 @@ def run(cfg: C.Config) -> None:
         playable = playable.union(seg.intersection(reach).buffer(ex["corridor_width"]))
         playable = playable.union(p.buffer(ex["buffer"]))
 
+    # Open world: everything inside the data bbox, less the horizon ring.
+    if w.get("open_world"):
+        lo0, la0, lo1, la1 = cfg.raw["fetch"]["bbox"]
+        to_utm = Transformer.from_crs(4326, cfg.crs, always_xy=True).transform
+        region = shapely.ops.transform(to_utm, box(lo0, la0, lo1, la1)).buffer(-w["horizon_ring"])
+        playable = playable.union(region)
     playable = shapely.simplify(shapely.make_valid(playable), 10)
     horizon = playable.buffer(w["horizon_ring"]).difference(playable)
 

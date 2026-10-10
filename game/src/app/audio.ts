@@ -4,6 +4,14 @@ import { Ambience, type AmbienceLevels } from './ambience';
 export class Audio {
   private ctx: AudioContext | null = null;
   private amb: Ambience | null = null;
+  private master: GainNode | null = null;
+  private volume = 1;
+
+  /** Master volume 0..1 (settings). */
+  setVolume(v: number) {
+    this.volume = v;
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
+  }
   private engine: { osc: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
 
   /** Must be called from a user gesture. */
@@ -11,6 +19,9 @@ export class Audio {
     if (this.ctx) return;
     try {
       this.ctx = new AudioContext();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.volume;
+      this.master.connect(this.ctx.destination);
     } catch {
       this.ctx = null;
     }
@@ -31,7 +42,7 @@ export class Audio {
       g.gain.linearRampToValueAtTime(vol, t0 + 0.01);
       g.gain.setValueAtTime(vol, t0 + 0.16);
       g.gain.linearRampToValueAtTime(0, t0 + 0.2);
-      g.connect(ctx.destination);
+      g.connect(this.master!);
       for (const f of freqs) {
         const o = ctx.createOscillator();
         o.type = 'square';
@@ -53,7 +64,7 @@ export class Audio {
         const g = ctx.createGain();
         g.gain.setValueAtTime(0.12, t0);
         g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
-        g.connect(ctx.destination);
+        g.connect(this.master!);
         for (const f of [2100, 2650]) {
           const o = ctx.createOscillator();
           o.type = 'sine';
@@ -77,7 +88,7 @@ export class Audio {
       gain.gain.linearRampToValueAtTime(0.18, t0 + 0.01);
       gain.gain.setValueAtTime(0.18, t0 + len - 0.04);
       gain.gain.linearRampToValueAtTime(0, t0 + len);
-      gain.connect(ctx.destination);
+      gain.connect(this.master!);
       for (const f of freqs) {
         const o = ctx.createOscillator();
         o.type = 'square';
@@ -92,7 +103,7 @@ export class Audio {
   /** City ambience levels for this frame (started lazily after the first user gesture). */
   ambience(dt: number, levels: AmbienceLevels) {
     if (!this.ctx) return;
-    this.amb ??= new Ambience(this.ctx);
+    this.amb ??= new Ambience(this.ctx, this.master!);
     this.amb.update(dt, levels);
   }
 
@@ -109,7 +120,7 @@ export class Audio {
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(0.15, t + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-      o.connect(g).connect(ctx.destination);
+      o.connect(g).connect(this.master!);
       o.start(t);
       o.stop(t + 0.32);
     });
@@ -136,7 +147,7 @@ export class Audio {
       band.Q.value = 0.5;
       this.rain = ctx.createGain();
       this.rain.gain.value = 0;
-      src.connect(band).connect(this.rain).connect(ctx.destination);
+      src.connect(band).connect(this.rain).connect(this.master!);
       src.start();
     }
     this.rain.gain.setTargetAtTime(level * 0.12, ctx.currentTime, 0.5);
@@ -168,7 +179,7 @@ export class Audio {
       osc.connect(filter);
       osc2.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.master!);
       osc.start();
       osc2.start();
       this.engine = { osc, osc2, gain };

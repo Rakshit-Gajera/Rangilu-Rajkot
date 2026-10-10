@@ -151,14 +151,21 @@ export class Environment {
     scene.add(this.sun, this.sun.target);
   }
 
+  private bodies: { sp: ReturnType<typeof bodyPosition>; mp: ReturnType<typeof bodyPosition> } | null = null;
+  private bodiesAt = 0;
+
   /** Weather inputs (render/weather.ts), 0..1. */
   overcast = 0;
   haze = 0;
 
   update(clock: Clock, focus: THREE.Vector3, camera: THREE.Camera) {
+    // Sun and moon positions change slowly: recompute when game time moved by more than ~20 s.
     const t = clock.instant();
-    const sp = bodyPosition('sun', t);
-    const mp = bodyPosition('moon', t);
+    if (!this.bodies || Math.abs(t.getTime() - this.bodiesAt) > 20_000) {
+      this.bodies = { sp: bodyPosition('sun', t), mp: bodyPosition('moon', t) };
+      this.bodiesAt = t.getTime();
+    }
+    const { sp, mp } = this.bodies;
     skyDirection(sp.altitude, sp.azimuth, this.sunDir);
     skyDirection(mp.altitude, mp.azimuth, this.moonDir);
     const alt = sp.altitude;

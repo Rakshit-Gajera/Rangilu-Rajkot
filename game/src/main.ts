@@ -12,6 +12,10 @@ import type { ActivityContext } from './activities/activity';
 import { Activities } from './activities/manager';
 import { exportSave, freshSave, importSave, loadSave, storeSave } from './app/save';
 import { DiscoveryLog } from './ui/discovery';
+import { Credits } from './ui/credits';
+import { Onboarding } from './ui/onboarding';
+import { enableTouch, isTouchDevice } from './app/touch';
+import { loadSettings, type Settings } from './app/settings';
 import { kindOfModel, SPECS, type Vehicle, type VehicleKind } from './actors/vehicle';
 import { Audio } from './app/audio';
 import { Input } from './app/input';
@@ -77,16 +81,44 @@ async function main() {
   const world = await World.load('world', physics, shadowSize > 0, quality.stream);
   scene.add(world.root);
 
-  const spawn = world.manifest.spawn;
+  let graph: RoadGraph | null = null;
+  try {
+    graph = world.manifest.map ? await RoadGraph.load(`world/${world.manifest.map}`) : null;
+  } catch (e) {
+    console.warn('map unavailable', e);
+  }
+  // Private places from this machine's pipeline/local.yaml (world/private.local.json, never published):
+  // a new session starts at home, on the road outside the gate. Automated tests keep the public spawn.
+  let home: { x: number; n: number } | null = null;
+  try {
+    const r = await fetch('world/private.local.json');
+    if (r.ok) home = (await r.json())?.places?.home ?? null;
+  } catch { /* no private places on this machine */ }
+  const useHome = !!home && (params.get('home') === '1' || (!navigator.webdriver && params.get('spawn') !== 'default'));
+  // Your neighbourhood is always drawn in full detail (props, signs, full trees), whatever the preset.
+  if (home) world.detailZones.push({ x: home.x, n: home.n, r: 800 });
+  const spawn = { ...world.manifest.spawn };
+  if (useHome && home) {
+    let [x, n] = [home.x, home.n];
+    let heading = 0;
+    if (graph) {
+      const u = graph.nearestNode(x, n, true);
+      [x, n] = graph.nodeXY(u);
+      const out = graph.outgoing(u)[0];
+      if (out) { const p = graph.pointAt(out[0], out[1], 0); heading = Math.atan2(p.dx, p.dn); }
+    }
+    Object.assign(spawn, { x, z: -n, heading });
+  }
   // Playable once the ground around the spawn is in (PROMPT §8.1); the rest streams in the background.
   await world.ensure(spawn.x, spawn.z, 350, (d, t) => { bar.style.width = `${(100 * d) / t}%`; });
 
   // Rapier scene queries only see new colliders after a step, so spawn heights come from the tile grid.
   const gy = world.terrainAt(spawn.x, spawn.z) ?? 30;
   const player = new Player(physics, scene, spawn.x, gy, spawn.z);
-  const sx = spawn.x + 2.2, sz = spawn.z + 1.0;
-  // Parked at the roadside facing along the ring road (yaw π = facing north).
-  const garage = new Garage(physics, scene, sx, world.terrainAt(sx, sz) ?? gy, sz, spawn.heading + Math.PI);
+  // Your scooter parked 2.4 m to the left of the road's direction (keep-left), facing along it.
+  // spawn.heading is a compass heading (0 = north); three.js headings have 0 = +z (south).
+  const sx = spawn.x - Math.cos(spawn.heading) * 2.4, sz = spawn.z - Math.sin(spawn.heading) * 2.4;
+  const garage = new Garage(physics, scene, sx, world.terrainAt(sx, sz) ?? gy, sz, Math.PI - spawn.heading);
   const scooter = garage.own;
   const env = new Environment(scene, renderer, shadowSize);
   // Spawn in the golden hour: 40 minutes before today's real sunset in Rajkot (PROMPT §3.1).
@@ -117,12 +149,19 @@ async function main() {
   }
 
   // --- Map, GPS and fast travel (PROMPT §3.5, §9.8). The game still works if the map fails to load.
-  let graph: RoadGraph | null = null;
-  try {
-    graph = world.manifest.map ? await RoadGraph.load(`world/${world.manifest.map}`) : null;
-  } catch (e) {
-    console.warn('map unavailable', e);
+  // Settings (Esc menu): volume, mouse, field of view, key hints.
+  const settings = loadSettings();
+  function applySettings(s: Settings) {
+    audio.setVolume(s.volume);
+    follow.sensitivity = s.sensitivity;
+    follow.invertY = s.invertY;
+    follow.baseFov = s.fov;
+    document.getElementById('help')!.hidden = !s.help;
   }
+  applySettings(settings);
+  const touch = isTouchDevice() || params.get('touch') === '1';
+  if (touch) { enableTouch(input); document.body.classList.add('touch'); }
+  const onboarding = new Onboarding(touch, (t) => hud.flash(t), useHome);
   const pause = new PauseMenu(quality.name, {
     exportSave: () => { writeSave(); exportSave(save); },
     importSave: () => {
@@ -132,24 +171,50 @@ async function main() {
         location.reload();
       });
     },
-  });
+  }, settings, applySettings, () => { pause.toggle(false); credits.toggle(true); });
+  const credits = new Credits();
   let routeTimer = 0;
   let traveling = false;
   let travelTo: THREE.Vector3 | null = null; // streaming follows the destination while travelling
   const here = () => (drivingV ? drivingV.position : player.position);
-  async function fastTravel(x: number, n: number) {
+  const fade = document.createElement('div');
+  fade.id = 'travel-fade';
+  document.body.appendChild(fade);
+  const frames = (k: number) => new Promise<void>((r) => { const f = () => (--k <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  /**
+   * Teleport (map, discoveries, activities, safety net). The screen fades while the area loads.
+   * exact: land right where asked (the map) unless that's inside a building; otherwise on the nearest road.
+   */
+  async function fastTravel(x: number, n: number, exact = false) {
     if (traveling) return;
     traveling = true;
-    hud.setPrompt('Travelling…');
-    // Land on the nearest road so you never appear inside a building.
-    if (graph) [x, n] = graph.nodeXY(graph.nearestNode(x, n, true));
+    fade.textContent = 'Travelling…';
+    fade.classList.add('on');
+    await new Promise((r) => setTimeout(r, 220)); // let the fade cover the jump
+    const road = graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n];
+    if (!exact || !world.isTile(x, -n)) [x, n] = road;
     travelTo = new THREE.Vector3(x, 0, -n);
-    await world.ensure(x, -n, 350);
-    const y = (world.terrainAt(x, -n) ?? 30) + 0.3;
+    await world.ensure(x, -n, 180, (d, t) => { fade.textContent = `Loading ${Math.round((100 * d) / t)}%`; });
+    await frames(2); // physics queries see new colliders after a step
+    let ground = world.terrainAt(x, -n) ?? 30;
+    if (exact) {
+      const top = physics.groundAt(x, -n, ground + 200);
+      if (top !== null && top > ground + 2.5) {
+        // Inside a building (or under a flyover): the street outside instead.
+        [x, n] = road;
+        travelTo.set(x, 0, -n);
+        await world.ensure(x, -n, 150);
+        await frames(2);
+        ground = world.terrainAt(x, -n) ?? ground;
+      } else if (top !== null) ground = top;
+    }
+    const y = ground + 0.3;
     if (drivingV) drivingV.teleport(x, y, -n);
     else player.teleport(x, y, -n);
     routeTimer = 0;
     travelTo = null;
+    await frames(3);
+    fade.classList.remove('on');
     traveling = false;
   }
   // Traffic, pedestrians and cows on the real road network (PROMPT §3.4).
@@ -159,11 +224,13 @@ async function main() {
   const signals = graph ? new Signals(graph, scene, [
     ...graph.data.labels.filter((l) => l.kind === 'chowk'), ...(graph.data.chowks ?? []).map(([x, n]) => ({ x, n }))]) : null;
   if (life) life.signals = signals;
+  if (life && home) life.denseZones.push({ x: home.x, n: home.n, r: 800 });
   const cityMap = graph ? new CityMap(graph, {
     player: () => { const p = here(); return { x: p.x, n: -p.z, heading: -follow.yaw }; },
     onWaypoint: () => { routeTimer = 0; },
     onClearWaypoint: () => { routeTimer = 0; },
-    onFastTravel: (x, n) => { void fastTravel(x, n); },
+    onFastTravel: (x, n) => { void fastTravel(x, n, true); },
+    home,
   }) : null;
   function updateRoute(dt: number) {
     if (!graph || !cityMap?.waypoint) return;
@@ -413,7 +480,7 @@ async function main() {
   if (OUTFITS[save.outfit]) player.character.setOutfit(OUTFITS[save.outfit]);
   const sandbox = new SandboxMenu(sandboxHooks);
   // Pick up where you left off (unless a test pins the start).
-  if (!params.has('hour') && save.pos) {
+  if (!params.has('hour') && save.pos && !useHome) {
     const [x, , z] = save.pos;
     if (world.isTile(x, z)) void fastTravel(x, -z).then(() => {
       if (save.vehicle && save.vehicle in SPECS) spawnVehicle(save.vehicle as VehicleKind, true);
@@ -432,12 +499,20 @@ async function main() {
   setTimeout(() => loadingEl.remove(), 700);
 
   let acc = 0;
+  let minimapTimer = 0, minimapYaw = 0;
+  let frameNo = 0;
   let saveTimer = 15;
   let simTime = 0;
   let lifeMs = 0;
   const worst: Record<string, number> = { sim: 0, hud: 0, route: 0 };
   let tMark = 0;
-  const mark = (name: string) => { const t = performance.now(); worst[name] = Math.max(worst[name] ?? 0, t - tMark); tMark = t; };
+  const avg: Record<string, number> = {};
+  const mark = (name: string) => {
+    const t = performance.now(), d = t - tMark;
+    worst[name] = Math.max(worst[name] ?? 0, d);
+    avg[name] = (avg[name] ?? d) * 0.97 + d * 0.03;
+    tMark = t;
+  };
   let last = performance.now();
   const frameTimes: number[] = [];
 
@@ -454,6 +529,7 @@ async function main() {
       else if (sandbox.open) sandbox.toggle(false);
       else if (activities?.open) activities.toggle(false);
       else if (discovery.open) discovery.toggle(false);
+      else if (credits.open) credits.toggle(false);
       else pause.toggle();
     }
     const mapOpen = !!cityMap?.open || pause.open;
@@ -467,7 +543,8 @@ async function main() {
     if (!mapOpen && !sandbox.open && input.hit('KeyP')) setCamMode('photo');
     if (camMode === 'photo') for (const code of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'KeyF', 'Enter']) if (input.hit(code)) photo.key(code);
     const freeCam = camMode === 'drone' ? drone : camMode === 'photo' ? photoCam : null;
-    const menuOpen = sandbox.open || !!activities?.open || discovery.open;
+    const menuOpen = sandbox.open || !!activities?.open || discovery.open || onboarding.blocking || credits.open;
+    onboarding.update(dt);
     const controls = mapOpen || traveling || menuOpen || freeCam ? null : input;
     // Something to get on: a parked vehicle of ours, or one from traffic (PROMPT §3.3: take any vehicle).
     const nearV = drivingV ? null : garage.nearest(player.position);
@@ -570,6 +647,13 @@ async function main() {
     if (res !== null) renderer.setPixelRatio(res);
     mark('dynres');
     const tRender = performance.now();
+    // Shadows render every other frame on High/Ultra: the shadow map keeps its own matrix, so they stay
+    // put in the world; only the shadowed area trails the player by one frame.
+    frameNo++;
+    if (renderer.shadowMap.enabled) {
+      renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = quality.name === 'medium' || frameNo % 2 === 0 || !!fixedView;
+    }
     if (photo.open) {
       // Focus on whatever is in the middle of the view (for depth of field).
       const dir = camera.getWorldDirection(new THREE.Vector3());
@@ -577,6 +661,7 @@ async function main() {
       photo.render(hit ? hit.timeOfImpact : 50);
     } else renderer.render(scene, camera);
     const renderMs = performance.now() - tRender;
+    avg.render = (avg.render ?? renderMs) * 0.97 + renderMs * 0.03;
 
     tMark = performance.now();
     // --- HUD ----------------------------------------------------------------------
@@ -585,7 +670,13 @@ async function main() {
     updateRoute(dt);
     worst.route = Math.max(worst.route, performance.now() - tRoute);
     const tHud = performance.now();
-    hud.drawMinimap(p.x, -p.z, follow.yaw, cityMap?.index ?? null, cityMap?.route ?? null, cityMap?.waypoint ?? null);
+    // The minimap redraws at ~20 Hz (or at once when you turn quickly): plenty for a 300 m map.
+    minimapTimer -= dt;
+    if (minimapTimer <= 0 || Math.abs(follow.yaw - minimapYaw) > 0.08) {
+      minimapTimer = 0.05;
+      minimapYaw = follow.yaw;
+      hud.drawMinimap(p.x, -p.z, follow.yaw, cityMap?.index ?? null, cityMap?.route ?? null, cityMap?.waypoint ?? null);
+    }
     hud.setClock(clock.label());
     hud.setSpeed(drivingV ? Math.abs(drivingV.speed) * 3.6 : null);
     if (!traveling) {
@@ -651,6 +742,7 @@ async function main() {
     geometries: () => renderer.info.memory.geometries,
     frameTimes: () => frameTimes.slice(),
     worst: () => ({ ...world.worst, ...worst }),
+    avg: () => ({ ...avg }),
     stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, drawnTriangles: renderer.info.render.triangles,
       busy: world.tiles.size, frameMs: frameTimes.reduce((a, b) => a + b, 0) / Math.max(frameTimes.length, 1) }),
     setView: (pos: number[], look: number[], hour?: number) => {

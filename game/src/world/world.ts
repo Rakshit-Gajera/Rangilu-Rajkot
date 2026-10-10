@@ -36,6 +36,7 @@ interface NearTile {
   build: TileBuild;
   group: THREE.Group;
   detail: THREE.Mesh[]; // hidden beyond `props`
+  pending: number; // meshes not shown yet
 }
 
 interface FarTile {
@@ -159,6 +160,7 @@ export class World {
       }
       onProgress?.(++done, want.length);
     }));
+    this.reveal(Infinity); // loading screen / teleport fade: show everything at once
     this.syncColliders();
     this.physics.pump(Infinity);
   }
@@ -192,6 +194,7 @@ export class World {
     }
     this.worst.uploads = Math.max(this.worst.uploads, performance.now() - tu);
     const tc = performance.now();
+    this.reveal(fixedBudget(budgetMs));
     this.syncColliders();
     this.physics.pump(Math.max(0.5, budgetMs - (performance.now() - t0)));
     this.worst.colliders = Math.max(this.worst.colliders, performance.now() - tc);
@@ -291,9 +294,15 @@ export class World {
       mesh.receiveShadow = this.shadows;
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
+      // Shown a few meshes per frame (see reveal()): the GPU upload happens on first draw.
+      mesh.visible = false;
+      mesh.userData.pending = true;
+      this.revealQueue.push({ mesh, key: b.key, verts: geo.position.length / 3 });
+      pending++;
       g.add(mesh);
       if (isDetail) detail.push(mesh);
     };
+    let pending = 0;
     add(b.terrain, m.terrain, false);
     add(b.areas.grass, m.grass, false);
     add(b.areas.sand, m.sand, false);
@@ -323,9 +332,32 @@ export class World {
     for (const geo of [b.terrain, b.areas.grass, b.areas.sand, b.areas.water, b.roads.surfaces, b.roads.markings,
       b.roads.bridges, b.buildings.walls, b.buildings.roofs, b.buildings.props, b.chowks.solid, b.chowks.deco,
       b.chowks.lamps, b.furniture.solid, b.furniture.lamps, b.furniture.pools, b.signs.mesh]) releaseGeoBuf(geo);
-    this.tiles.set(b.key, { build: b, group: g, detail });
+    this.tiles.set(b.key, { build: b, group: g, detail, pending });
     this.treeLayer.invalidate();
-    const far = this.farTiles.get(b.key);
+    if (!pending) this.revealed(b.key);
+  }
+
+  /** Meshes waiting for their first draw, oldest first. */
+  private revealQueue: { mesh: THREE.Mesh; key: string; verts: number }[] = [];
+
+  /**
+   * Show queued meshes within a per-frame vertex budget, so a new tile's GPU upload is spread over a few
+   * frames instead of one hitch. The far mesh under a tile is hidden only once all of it is visible.
+   */
+  private reveal(budget: number) {
+    let used = 0;
+    while (this.revealQueue.length && (used === 0 || used + this.revealQueue[0].verts <= budget)) {
+      const { mesh, key, verts } = this.revealQueue.shift()!;
+      used += verts;
+      mesh.userData.pending = false;
+      mesh.visible = true; // detail meshes are re-checked by syncDetail() right after
+      const t = this.tiles.get(key);
+      if (t && --t.pending === 0) this.revealed(key);
+    }
+  }
+
+  private revealed(key: string) {
+    const far = this.farTiles.get(key);
     if (far) far.mesh.visible = false;
   }
 
@@ -338,7 +370,7 @@ export class World {
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     mesh.receiveShadow = false;
-    mesh.visible = !this.tiles.has(b.key);
+    mesh.visible = this.tiles.get(b.key)?.pending !== 0; // hidden only under a fully shown near tile
     this.root.add(mesh);
     this.farTiles.set(b.key, { build: b, mesh });
   }
@@ -351,6 +383,7 @@ export class World {
     t.group.userData.dispose?.();
     this.root.remove(t.group);
     this.tiles.delete(key);
+    this.revealQueue = this.revealQueue.filter((q) => q.key !== key);
     this.treeLayer.invalidate();
     const far = this.farTiles.get(key);
     if (far) far.mesh.visible = true;
@@ -387,14 +420,22 @@ export class World {
   }
 
   /** LOD0 vs LOD1: props and lane markings only close to the player. */
+  /** Places shown in full detail whatever the preset (e.g. the player's home neighbourhood). */
+  detailZones: { x: number; n: number; r: number }[] = [];
+
+  private inZone(x: number, n: number, pad = 0) {
+    return this.detailZones.some((z) => Math.hypot(z.x - x, z.n - n) <= z.r + pad);
+  }
+
   private syncDetail() {
     for (const t of this.tiles.values()) {
       const d = this.dist(t.build, this.focus.x, this.focus.n);
-      for (const m of t.detail) m.visible = d <= this.config.props;
+      const zone = this.detailZones.some((z) => this.dist(t.build, z.x, z.n) <= z.r);
+      for (const m of t.detail) if (!m.userData.pending) m.visible = d <= this.config.props || (zone && d <= Math.max(this.config.props, 900));
     }
     const trees = this.config.trees;
-    this.treeLayer.update(this.treeSources(), this.focus.x, -this.focus.n, Math.min(160, Math.max(70, this.config.props * 0.45)), trees,
-      this.viewDir.x, this.viewDir.z);
+    const hiR = this.inZone(this.focus.x, this.focus.n) ? 220 : Math.min(160, Math.max(70, this.config.props * 0.45));
+    this.treeLayer.update(this.treeSources(), this.focus.x, -this.focus.n, hiR, trees, this.viewDir.x, this.viewDir.z);
   }
 
   private keyAt(x: number, z: number) {
@@ -473,4 +514,9 @@ function toGeometry(g: GeoBuf, dropAfterUpload = true, uvName = 'fuv'): THREE.Bu
   geo.setIndex(attr(g.index, 1));
   geo.computeBoundingSphere();
   return geo;
+}
+
+/** Vertices shown per frame: ~200k normally (a typical tile in 2–4 frames), unlimited for test views. */
+function fixedBudget(budgetMs: number) {
+  return budgetMs > 20 ? Infinity : 200_000;
 }

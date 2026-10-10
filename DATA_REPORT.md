@@ -8,42 +8,42 @@ Generated 2026-10-10 by `python -m rajkot_bake report`. Phase 0 (data recon).
 |---|---|---|
 | No invalid geometry | PASS | 0 invalid |
 | Overlapping buildings < 0.5 % | PASS | 0.00% (0) overlap > 1 m² |
-| Largest road component ≥ 98 % of drivable length | PASS | 99.5% |
-| Every tile ≤ 1 MB | PASS | largest tile 56 kB of 1308 tiles |
+| Largest road component ≥ 98 % of drivable length | PASS | 99.7% |
+| Every tile ≤ 1 MB | PASS | largest tile 57 kB of 6336 tiles |
 | Every landmark located (unambiguous, inside the playable area) | WAIVED (P0: six landmarks need positions from Rakshit) | missing/ambiguous: connaught_hall, dharmendra_road, lakhajiraj_road, sadar_bazaar, ramvan, trimandir; outside playable: none |
 
 ## World frame
 
 - Projection EPSG:32642; origin [70.80185, 22.29487] (Overture places: Trikonbaug Ka Raja), E 685623 N 2466573.
-- Playable area 296.4 km², extent 21.0 × 28.5 km; horizon ring 3 km.
-- Tiles: 1308 active of a 43 × 57 grid (500 m).
+- Playable area 1543.4 km², extent 35.7 × 44.2 km; horizon ring 3 km.
+- Tiles: 6336 active of a 73 × 89 grid (500 m).
 - Lakes matched: Aji-1, Nyari-1, Lalpari, Randarda.
 
 ## Buildings
 
-- Final buildings: **151,780** in the playable area (raw bbox: 337,856 Overture buildings, 12,695 OSM building outlines).
+- Final buildings: **284,213** in the playable area (raw bbox: 337,856 Overture buildings, 12,695 OSM building outlines).
 | Outline source | Buildings |
 |---|---|
-| Microsoft ML | 74356 |
-| Google Open Buildings | 64921 |
-| OpenStreetMap | 12503 |
+| Microsoft ML | 139601 |
+| Google Open Buildings | 132012 |
+| OpenStreetMap | 12600 |
 
 | Height source | Buildings |
 |---|---|
-| ghsl | 140,242 (92.4%) |
-| heuristic | 11,523 (7.6%) |
+| ghsl | 232,667 (81.9%) |
+| heuristic | 51,531 (18.1%) |
 | osm_levels | 13 (0.0%) |
 | osm_height | 2 (0.0%) |
 
 | Floors | Buildings |
 |---|---|
-| 1 | 47,145 |
-| 2 | 50,738 |
-| 3 | 34,013 |
-| 4 | 13,150 |
-| 5 | 3,863 |
-| 6 | 1,501 |
-| 7 | 683 |
+| 1 | 138,185 |
+| 2 | 84,946 |
+| 3 | 40,512 |
+| 4 | 13,775 |
+| 5 | 3,912 |
+| 6 | 1,512 |
+| 7 | 684 |
 | 8 | 332 |
 | 9 | 169 |
 | 10 | 88 |
@@ -58,60 +58,61 @@ Generated 2026-10-10 by `python -m rajkot_bake report`. Phase 0 (data recon).
 |---|---|
 | Z1 Old city | 4,494 |
 | Z2 Heritage | 127 |
-| Z3 Societies | 120,488 |
+| Z3 Societies | 178,372 |
 | Z4 Commercial corridor | 1,698 |
-| Z5 New high-rise | 4,356 |
-| Z6 Industrial | 1,762 |
-| Z7 Outskirts | 18,855 |
+| Z5 New high-rise | 4,368 |
+| Z6 Industrial | 17,035 |
+| Z7 Outskirts | 78,119 |
 
 | Use | Buildings |
 |---|---|
-| residential | 147,428 |
-| mixed | 1,756 |
-| industrial | 1,755 |
-| healthcare | 276 |
-| educational | 262 |
-| religious | 151 |
-| commercial | 91 |
-| civic | 60 |
+| residential | 264,493 |
+| industrial | 17,011 |
+| mixed | 1,780 |
+| healthcare | 292 |
+| educational | 287 |
+| religious | 168 |
+| commercial | 116 |
+| civic | 64 |
 | transport | 1 |
+| other | 1 |
 
-- Shop ground floor: 1,843; corner plots: 18,250; shared-wall buildings: 35,885; outlines squared: 105,770.
-- Flagged for review: 1 giant outlines (> 20,000 m²), 0 heights > 60 m.
+- Shop ground floor: 1,886; corner plots: 21,426; shared-wall buildings: 55,988; outlines squared: 217,666.
+- Flagged for review: 3 giant outlines (> 20,000 m²), 0 heights > 60 m.
 
 ## Roads
 
-- Drivable length 3336.2 km; 34 connected components.
+- Drivable length 5577.3 km; 31 connected components.
 | OSM class | km |
 |---|---|
-| residential | 2291.9 |
-| tertiary | 376.7 |
-| service | 252.3 |
-| track | 148.9 |
-| primary | 133.4 |
-| unclassified | 96.8 |
-| trunk | 88.4 |
-| secondary | 76.8 |
-| footway | 9.6 |
+| residential | 3243.9 |
+| track | 855.3 |
+| tertiary | 791.3 |
+| service | 539.8 |
+| unclassified | 421.7 |
+| primary | 305.7 |
+| trunk | 128.1 |
+| secondary | 126.7 |
+| path | 30.6 |
+| footway | 14.8 |
 | living_street | 8.8 |
 | pedestrian | 7.8 |
-| path | 7.5 |
-| construction | 4.4 |
+| construction | 4.5 |
 | bus_guideway | 1.6 |
-| trunk_link | 1.4 |
+| trunk_link | 1.5 |
 | tertiary_link | 1.1 |
-| primary_link | 0.4 |
+| primary_link | 0.5 |
 | secondary_link | 0.2 |
 | steps | 0.1 |
 
 | Width rule | km |
 |---|---|
-| class_default | 3394.3 |
-| lanes | 99.5 |
+| class_default | 6302.6 |
+| lanes | 167.1 |
 | name_feet | 14.4 |
 
 - Roads whose name gives the width: 150 Foot Ring Road, 150 Foot Ring Road Flyover, 150 feet ring road, 150Feet Ring Road Railway Flyover, 40 ft. road, BRTS Route (150 ft. Ring Road), Nana Mava Circle Flyover, Shahid Flyover.
-- Bridges/flyovers: 45.65 km.
+- Bridges/flyovers: 68.13 km.
 
 ## Landmarks
 

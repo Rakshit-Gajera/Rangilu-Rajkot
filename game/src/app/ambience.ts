@@ -31,10 +31,10 @@ export class Ambience {
   private bellTimer = 20;
   private murmurTimer = 0;
 
-  constructor(private ctx: AudioContext) {
+  constructor(private ctx: AudioContext, private dest: AudioNode) {
     const out = ctx.createGain();
     out.gain.value = 1;
-    out.connect(ctx.destination);
+    out.connect(dest);
     const loop = (buf: AudioBuffer) => {
       const s = ctx.createBufferSource();
       s.buffer = buf;
@@ -123,7 +123,7 @@ export class Ambience {
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(0.02, t0 + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
-      o.connect(g).connect(c.destination);
+      o.connect(g).connect(this.dest);
       o.start(t0);
       o.stop(t0 + 0.1);
     }
@@ -140,7 +140,7 @@ export class Ambience {
         o.frequency.value = f;
         g.gain.setValueAtTime(a, t0);
         g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.5);
-        o.connect(g).connect(c.destination);
+        o.connect(g).connect(this.dest);
         o.start(t0);
         o.stop(t0 + 2.6);
       }

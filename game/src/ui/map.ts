@@ -7,6 +7,8 @@ export interface MapCallbacks {
   onWaypoint: (x: number, n: number) => void;
   onClearWaypoint: () => void;
   onFastTravel: (x: number, n: number) => void;
+  /** Private home (this machine only), if known. */
+  home?: { x: number; n: number } | null;
 }
 
 /** Full-screen city map (M): pan, zoom, landmarks, waypoint, fast travel (PROMPT §3.5, §9.8). */
@@ -32,7 +34,9 @@ export class CityMap {
       <aside>
         <h2>Rajkot <span lang="gu">રાજકોટ</span></h2>
         <p class="hint">Drag to pan · wheel to zoom · click to set a waypoint<br>
-          <b>F</b> fast travel to the waypoint · <b>Del</b> clear · <b>M</b>/<b>Esc</b> close</p>
+          <b>Double-click</b> or <b>F</b> to teleport there · <b>Del</b> clear · <b>M</b>/<b>Esc</b> close</p>
+        <div class="map-buttons"><button id="map-go" disabled>Teleport to waypoint</button>
+          ${cb.home ? '<button id="map-home">Go home</button>' : ''}</div>
         <p id="map-route"></p>
         <h3>Places</h3>
         <ul id="map-places"></ul>
@@ -73,6 +77,19 @@ export class CityMap {
       }
       this.drag = null;
     });
+    // Double-click anywhere: teleport straight there.
+    this.canvas.addEventListener('dblclick', (e) => {
+      const r = this.canvas.getBoundingClientRect();
+      const [x, n] = toWorld(this.view, e.clientX - r.left, e.clientY - r.top);
+      this.setWaypoint(x, n);
+      this.travel();
+    });
+    this.root.querySelector('#map-go')!.addEventListener('click', () => this.travel());
+    this.root.querySelector('#map-home')?.addEventListener('click', () => {
+      if (!cb.home) return;
+      this.setWaypoint(cb.home.x, cb.home.n);
+      this.travel();
+    });
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const r = this.canvas.getBoundingClientRect();
@@ -86,8 +103,15 @@ export class CityMap {
     addEventListener('resize', () => this.open && this.draw());
   }
 
+  private travel() {
+    if (!this.waypoint) return;
+    this.cb.onFastTravel(this.waypoint.x, this.waypoint.n);
+    this.toggle(false);
+  }
+
   setWaypoint(x: number, n: number) {
     this.waypoint = { x, n };
+    (this.root.querySelector('#map-go') as HTMLButtonElement).disabled = false;
     this.cb.onWaypoint(x, n);
     this.draw();
   }
@@ -95,6 +119,7 @@ export class CityMap {
   clearWaypoint() {
     this.waypoint = null;
     this.route = null;
+    (this.root.querySelector('#map-go') as HTMLButtonElement).disabled = true;
     this.cb.onClearWaypoint();
     this.draw();
   }
@@ -123,10 +148,8 @@ export class CityMap {
   key(code: string): boolean {
     if (!this.open) return false;
     if (code === 'KeyM' || code === 'Escape') this.toggle(false);
-    else if (code === 'KeyF' && this.waypoint) {
-      this.cb.onFastTravel(this.waypoint.x, this.waypoint.n);
-      this.toggle(false);
-    } else if (code === 'Delete' || code === 'Backspace') this.clearWaypoint();
+    else if (code === 'KeyF' && this.waypoint) this.travel();
+    else if (code === 'Delete' || code === 'Backspace') this.clearWaypoint();
     else return false;
     return true;
   }
@@ -179,6 +202,18 @@ export class CityMap {
         c.fillStyle = 'rgba(255,240,220,0.75)';
         c.fillText(l.gu ? `${l.t} · ${l.gu}` : l.t, sx, sy);
       }
+    }
+    if (this.cb.home) {
+      // Home: a small house glyph.
+      const [hx, hy] = toScreen(this.view, this.cb.home.x, this.cb.home.n);
+      c.fillStyle = '#f59e0b';
+      c.beginPath();
+      c.moveTo(hx, hy - 11); c.lineTo(hx + 9, hy - 3); c.lineTo(hx + 6, hy - 3); c.lineTo(hx + 6, hy + 6);
+      c.lineTo(hx - 6, hy + 6); c.lineTo(hx - 6, hy - 3); c.lineTo(hx - 9, hy - 3);
+      c.closePath();
+      c.fill();
+      c.font = '600 12px "Noto Sans", sans-serif';
+      c.fillText('Home', hx, hy - 18);
     }
     if (this.waypoint) drawPin(c, ...toScreen(this.view, this.waypoint.x, this.waypoint.n));
     const p = this.cb.player();

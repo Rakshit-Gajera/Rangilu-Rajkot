@@ -26,6 +26,17 @@ export class Input {
     canvas.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
   }
 
+  /** Touch controls: press or release a key. */
+  setHeld(code: string, on: boolean) {
+    if (on && !this.down.has(code)) this.pressed.add(code);
+    if (on) this.down.add(code); else this.down.delete(code);
+  }
+
+  /** Touch controls: a single key press. */
+  tap(code: string) {
+    this.pressed.add(code);
+  }
+
   held(code: string) {
     return this.down.has(code);
   }

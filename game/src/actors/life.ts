@@ -13,7 +13,7 @@ import type { World } from '../world/world';
  * and gives way to the player and to cows. Agents are kinematic; those near the player get colliders.
  */
 
-type Kind = 'vehicle' | 'ped' | 'cow';
+type Kind = 'vehicle' | 'ped' | 'cow' | 'parked';
 
 interface Agent {
   kind: Kind;
@@ -78,13 +78,16 @@ export class Life {
   readonly agents: Agent[] = [];
   private meshes: THREE.InstancedMesh[];
   private rnd = 1234567;
-  private counts: Record<Kind, number> = { vehicle: 0, ped: 0, cow: 0 };
+  private counts: Record<Kind, number> = { vehicle: 0, ped: 0, cow: 0, parked: 0 };
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private up = new THREE.Vector3(0, 1, 0);
   maxVehicles: number;
   maxPeds: number;
   maxCows: number;
+  maxParked: number;
+  /** Busier places (e.g. the player's neighbourhood): more parked vehicles and people around. */
+  denseZones: { x: number; n: number; r: number }[] = [];
   onHorn: ((x: number, y: number, z: number, kind: ModelName) => void) | null = null;
 
   constructor(private graph: RoadGraph, private world: World, private physics: Physics, scene: THREE.Scene,
@@ -92,6 +95,7 @@ export class Life {
     this.maxVehicles = caps.vehicles;
     this.maxPeds = caps.peds;
     this.maxCows = caps.cows;
+    this.maxParked = Math.round(caps.vehicles * 0.35);
     const mat = vertexColorMaterial({ roughness: 0.7 });
     this.meshes = MODELS.map((name) => {
       const g = vehicleModel(name);
@@ -163,6 +167,16 @@ export class Life {
       const off = rank >= 6 ? half + 0.6 + this.rand() * 1.2 : Math.max(0.6, half - 0.3 - this.rand() * 0.5);
       lane = (this.rand() < 0.5 ? 1 : -1) * off;
       v0 = 1.1 + this.rand() * 0.5;
+    } else if (kind === 'parked') {
+      // Parked at the kerb, facing either way: mostly scooters and bikes, some cars.
+      const PARKED = ['scooter', 'scooter', 'scooter', 'motorcycle', 'motorcycle', 'car-white', 'car-silver', 'car-red', 'auto', 'bicycle'] as const;
+      const m = PARKED[Math.floor(this.rand() * PARKED.length)];
+      model = MODELS.indexOf(m);
+      const wide = m.startsWith('car') || m === 'auto';
+      lane = (this.rand() < 0.5 ? 1 : -1) * Math.max(0.6, half - (wide ? 0.95 : 0.45));
+      length = wide ? 3.8 : 1.8;
+      v0 = 0;
+      sp.s = this.rand() * this.graph.edgeLength(sp.edge); // anywhere along the street
     } else {
       model = MODELS.indexOf(this.rand() < 0.6 ? 'cow-sit' : 'cow-stand');
       lane = (this.rand() < 0.5 ? 1 : -1) * Math.max(0.8, half - 0.6 + this.rand() * 0.6);
@@ -207,10 +221,12 @@ export class Life {
       vehicle: this.maxVehicles * density * this.trafficScale,
       ped: this.maxPeds * (0.3 + 0.7 * density) * this.pedScale,
       cow: this.maxCows,
+      parked: this.maxParked,
     };
+    if (this.denseZones.some((z) => Math.hypot(z.x - px, z.n - pn) < z.r)) { target.parked *= 2; target.ped *= 1.5; }
     for (let k = 0; k < 2; k++) {
       let pick: Kind | null = null, worst = 1;
-      for (const kind of ['vehicle', 'ped', 'cow'] as Kind[]) {
+      for (const kind of ['vehicle', 'ped', 'cow', 'parked'] as Kind[]) {
         const fill = target[kind] > 0 ? this.counts[kind] / target[kind] : 1;
         if (fill < worst) { worst = fill; pick = kind; }
       }
@@ -231,7 +247,7 @@ export class Life {
       l.push(a);
     }
     for (const l of lanes.values()) l.sort((p, q) => p.s - q.s);
-    const cows = this.agents.filter((a) => a.kind === 'cow');
+    const cows = this.agents.filter((a) => a.kind === 'cow' || a.kind === 'parked');
 
     for (let k = this.agents.length - 1; k >= 0; k--) {
       const a = this.agents[k];
@@ -271,6 +287,8 @@ export class Life {
           a.honk -= dt;
           if (a.honk < 0) { a.honk = 2 + this.rand() * 5; this.onHorn?.(a.x, a.y, -a.n, MODELS[a.model]); }
         } else a.honk = 1 + this.rand();
+      } else if (a.kind === 'parked') {
+        a.v = 0;
       } else if (a.kind === 'ped') {
         a.wait -= dt;
         a.v = a.wait > 0 && a.wait < 3 ? 0 : a.v0; // pause now and then
@@ -406,6 +424,6 @@ export class Life {
   }
 
   stats() {
-    return { vehicles: this.count('vehicle'), peds: this.count('ped'), cows: this.count('cow') };
+    return { vehicles: this.count('vehicle'), peds: this.count('ped'), cows: this.count('cow'), parked: this.count('parked') };
   }
 }

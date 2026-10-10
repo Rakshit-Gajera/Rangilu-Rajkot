@@ -54,6 +54,9 @@ world:
       buffer: 600.0
       corridor_road: "Morbi"
       corridor_width: 300.0
+  # Open world (Rakshit, 2026-10-10: "I should be able to go at every place"): the whole fetched region is
+  # playable, keeping the horizon ring inside the data bbox.
+  open_world: true
   horizon_ring: 3000.0
   tile_size: 500.0
 

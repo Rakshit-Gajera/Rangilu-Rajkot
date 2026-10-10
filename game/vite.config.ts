@@ -23,7 +23,8 @@ function worldPackage(): Plugin {
       if (existsSync(WORLD)) {
         cpSync(WORLD, resolve(import.meta.dirname, 'dist/world'), {
           recursive: true,
-          filter: (src: string) => !src.includes('preview'),
+          // Never publish the preview map or private places (home location).
+          filter: (src: string) => !src.includes('preview') && !src.includes('private.local'),
         });
       }
     },
@@ -35,6 +36,6 @@ export default defineConfig({
   plugins: [wasm(), worldPackage()],
   worker: { format: 'es', plugins: () => [wasm()] },
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
-  server: { port: 5173 },
+  server: { port: 5173, fs: { allow: ['..'] } }, // CREDITS.md lives at the repo root
   test: { include: ['tests/**/*.test.ts'] },
 });

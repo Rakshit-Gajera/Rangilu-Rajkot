@@ -1,6 +1,21 @@
 # Plan
 
-Current phase: **P5 — Sandbox and activities** (PROMPT.md §3.3–3.6, §9.8–9.10, §10). Gate: fun check by Rakshit.
+Current phase: **P6 — Polish and ship** (PROMPT.md §13). Gate: v1.0 release.
+
+## P6 tasks (started 2026-10-10 at Rakshit's request)
+- [x] 6.1 Open world: the whole data region (1,543 km², 6,336 tiles, 26 MB) — every village and highway around Rajkot
+- [x] 6.2 Private home spawn from pipeline/local.yaml (world/private.local.json: git-ignored, never in builds);
+      full detail and busier streets (parked vehicles, more people) around home
+- [x] 6.3 Map: double-click anywhere (or "Teleport to waypoint" / "Go home") teleports exactly there, with a loading fade
+- [x] 6.4 Smoother High/Ultra: shadows every other frame, new tiles uploaded over several frames, minimap at 20 Hz,
+      lower max pixel ratio, slightly smaller full-detail radius
+- [x] 6.5 Settings (volume, mouse sensitivity, invert Y, FOV, key hints), credits screen from CREDITS.md
+- [x] 6.6 Onboarding (welcome card + timed tips) and touch controls (stick, look, buttons)
+- [ ] 6.7 Language: English / ગુજરાતી for the UI
+- [ ] 6.8 Accessibility pass (UI scale, reduced motion, colour-safe markers)
+- [ ] 6.9 Bug bash + README + published link (needs Rakshit's OK to publish)
+
+Previous: **P5 — Sandbox and activities**. Gate: fun check by Rakshit.
 
 Previous: **P4 — Life** (core done; 4.5–4.7 continue inside P5)
 

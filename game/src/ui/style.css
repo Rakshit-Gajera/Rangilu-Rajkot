@@ -134,3 +134,44 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color:
 @keyframes pop { 0% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(1); } }
 #sandbox button.on { border-color: #f59e0b; color: #ffd28a; }
 #sandbox h3 small { text-transform: none; letter-spacing: 0; color: #ffd28a; }
+
+/* Teleport fade */
+#travel-fade { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: #0c0a09; color: #ffd28a;
+  font-size: 18px; font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+#travel-fade.on { opacity: 1; }
+#citymap .map-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+#citymap .map-buttons button { padding: 8px 12px; font: inherit; font-weight: 600; border: 0; border-radius: 8px; background: #f59e0b; color: #1c1917; cursor: pointer; }
+#citymap .map-buttons button:disabled { background: #44403c; color: #a8a29e; cursor: default; }
+
+#pause label input[type=range] { width: 100%; accent-color: #f59e0b; }
+#pause label.check { display: flex; align-items: center; gap: 8px; }
+#pause .panel { max-height: calc(100vh - 32px); overflow: auto; }
+#pause button.plain { margin-top: 14px; background: #292524; color: #f5f5f4; border: 1px solid #57534e; }
+#credits { position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; background: rgba(10, 8, 6, 0.7); padding: 16px; }
+#credits[hidden] { display: none; }
+#credits .panel { background: #1c1917; border: 1px solid #44403c; border-radius: 12px; padding: 18px 22px; width: min(720px, 100%);
+  max-height: 100%; overflow: auto; color: #e7e5e4; font-size: 13px; line-height: 1.5; }
+#credits h2 { color: #ffd28a; margin: 0 0 8px; } #credits h3 { color: #ffd28a; margin: 14px 0 4px; font-size: 14px; }
+#credits a { color: #93c5fd; word-break: break-all; }
+#credits button { margin-top: 10px; padding: 8px 14px; font: inherit; font-weight: 600; border: 0; border-radius: 8px; background: #f59e0b; color: #1c1917; cursor: pointer; }
+
+/* Welcome card */
+#welcome { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(10, 8, 6, 0.55); padding: 16px; }
+#welcome .panel { background: #1c1917; border: 1px solid #f59e0b; border-radius: 14px; padding: 20px 24px; width: min(460px, 100%); color: #f5f5f4; line-height: 1.5; }
+#welcome h2 { margin: 0 0 8px; color: #ffd28a; }
+#welcome ul { padding-left: 18px; font-size: 14px; }
+#welcome button { width: 100%; padding: 11px; font: inherit; font-weight: 700; border: 0; border-radius: 9px; background: #f59e0b; color: #1c1917; cursor: pointer; }
+
+/* Touch controls */
+#touch { position: fixed; inset: 0; z-index: 12; pointer-events: none; touch-action: none; }
+#touch .stick { position: absolute; left: 24px; bottom: 28px; width: 130px; height: 130px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12); border: 2px solid rgba(255, 255, 255, 0.3); pointer-events: auto; touch-action: none; display: grid; place-items: center; }
+#touch .stick i { width: 54px; height: 54px; border-radius: 50%; background: rgba(255, 255, 255, 0.45); }
+#touch .look { position: absolute; right: 0; top: 0; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
+#touch .buttons { position: absolute; right: 16px; bottom: 24px; display: grid; grid-template-columns: repeat(3, 56px); gap: 10px; pointer-events: auto; }
+#touch .buttons button { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(28, 25, 23, 0.55);
+  color: #fff; font-size: 20px; font-weight: 700; touch-action: none; }
+@media (pointer: coarse) { #help { display: none; } }
+/* With touch controls the minimap moves to the top-left and the speed above the buttons. */
+body.touch #minimap { top: 10px; bottom: auto; width: 130px; height: 130px; }
+body.touch #speed { bottom: 160px; }

@@ -16,8 +16,8 @@ export interface Quality {
 export const PRESETS: Record<QualityName, Quality> = {
   low: { name: 'low', stream: { near: 450, far: 1200, props: 150, trees: 300, colliders: 300 }, shadowSize: 0, maxPixelRatio: 1, targetFps: 30, life: { vehicles: 50, peds: 80, cows: 8 } },
   medium: { name: 'medium', stream: { near: 750, far: 2000, props: 250, trees: 500, colliders: 300 }, shadowSize: 1024, maxPixelRatio: 1, targetFps: 60, life: { vehicles: 90, peds: 160, cows: 14 } },
-  high: { name: 'high', stream: { near: 1100, far: 3000, props: 300, trees: 700, colliders: 300 }, shadowSize: 2048, maxPixelRatio: 1.5, targetFps: 60, life: { vehicles: 150, peds: 300, cows: 20 } },
-  ultra: { name: 'ultra', stream: { near: 1500, far: 4000, props: 450, trees: 1100, colliders: 350 }, shadowSize: 4096, maxPixelRatio: 2, targetFps: 60, life: { vehicles: 200, peds: 400, cows: 28 } },
+  high: { name: 'high', stream: { near: 950, far: 3000, props: 300, trees: 700, colliders: 300 }, shadowSize: 2048, maxPixelRatio: 1.25, targetFps: 60, life: { vehicles: 150, peds: 300, cows: 20 } },
+  ultra: { name: 'ultra', stream: { near: 1250, far: 4000, props: 450, trees: 1100, colliders: 350 }, shadowSize: 3072, maxPixelRatio: 1.75, targetFps: 60, life: { vehicles: 200, peds: 400, cows: 28 } },
 };
 
 function stored(): QualityName | null {
