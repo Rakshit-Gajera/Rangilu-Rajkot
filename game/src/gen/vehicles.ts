@@ -8,6 +8,7 @@ import { box, segment, sphere } from './prims';
 export const MODELS = [
   'scooter', 'motorcycle', 'auto', 'chhakdo', 'car-white', 'car-red', 'car-silver', 'car-blue', 'bus',
   'ped-kurta', 'ped-shirt', 'ped-saree', 'ped-salwar', 'cow-stand', 'cow-sit',
+  'bicycle', 'suv-white', 'suv-black', 'tractor',
 ] as const;
 export type ModelName = (typeof MODELS)[number];
 
@@ -17,12 +18,18 @@ const GLASS = [0.2, 0.28, 0.32];
 const SKIN = [0.55, 0.37, 0.24];
 const HAIR = [0.08, 0.06, 0.05];
 
+/** Options for the player's own vehicles: no rider (the player sits there) and wheels as separate meshes. */
+export interface ModelOptions { rider?: boolean; wheels?: boolean }
+let opts: Required<ModelOptions> = { rider: true, wheels: true };
+
 function wheel(b: Builder, x: number, z: number, r: number, w: number) {
+  if (!opts.wheels) return;
   segment(b, [x - w / 2, r, z], [x + w / 2, r, z], r, r, TYRE, 10);
 }
 
 /** Seated rider (two-wheelers, auto driver). */
 function rider(b: Builder, z: number, seatY: number, shirt: number[]) {
+  if (!opts.rider) return;
   segment(b, [0, seatY, z], [0, seatY + 0.62, z + 0.05], 0.17, 0.19, shirt, 8);
   sphere(b, [0, seatY + 0.78, z + 0.06], 0.11, SKIN, 1.1, 8);
   sphere(b, [0, seatY + 0.84, z + 0.04], 0.115, HAIR, 0.6, 8);
@@ -67,7 +74,19 @@ function car(b: Builder, body: number[]) {
   box(b, 0, 0.55, 1.88, 1.4, 0.15, 0.04, [0.95, 0.95, 0.85]); // headlights
 }
 
-export function vehicleModel(name: ModelName): GeoBuf {
+function suv(b: Builder, body: number[]) {
+  box(b, 0, 0.42, 0, 1.8, 0.75, 4.4, body);
+  box(b, 0, 1.17, -0.15, 1.72, 0.62, 3.0, GLASS);
+  box(b, 0, 1.79, -0.15, 1.74, 0.07, 3.0, body);
+  for (const s of [-1, 1]) box(b, s * 0.6, 1.86, -0.15, 0.05, 0.05, 2.6, BLACK); // roof rails
+  box(b, 0, 0.3, 2.21, 1.8, 0.3, 0.06, BLACK); // bumper
+  box(b, 0, 0.75, 2.2, 1.5, 0.15, 0.04, [0.95, 0.95, 0.85]);
+  box(b, 0, 0.8, -2.26, 0.8, 0.6, 0.12, BLACK); // spare wheel
+  for (const s of [-1, 1]) for (const z of [1.45, -1.45]) wheel(b, s * 0.8, z, 0.38, 0.26);
+}
+
+export function vehicleModel(name: ModelName, options: ModelOptions = {}): GeoBuf {
+  opts = { rider: true, wheels: true, ...options };
   const b = new Builder(false, { color: 3 });
   switch (name) {
     case 'scooter': {
@@ -118,6 +137,36 @@ export function vehicleModel(name: ModelName): GeoBuf {
       box(b, 0, 1.45, 0, 2.5, 0.9, 10.5, GLASS);
       box(b, 0, 2.35, 0, 2.5, 0.55, 10.5, W);
       for (const s of [-1, 1]) for (const z of [3.6, -3.4]) wheel(b, s * 1.1, z, 0.48, 0.3);
+      break;
+    }
+    case 'bicycle': {
+      const F = [0.12, 0.12, 0.14];
+      wheel(b, 0, 0.55, 0.33, 0.04); wheel(b, 0, -0.5, 0.33, 0.04);
+      segment(b, [0, 0.33, -0.5], [0, 0.85, -0.15], 0.02, 0.02, F, 5); // seat tube
+      segment(b, [0, 0.85, -0.15], [0, 0.9, 0.45], 0.02, 0.02, F, 5); // top tube
+      segment(b, [0, 0.33, -0.1], [0, 0.9, 0.45], 0.02, 0.02, F, 5); // down tube
+      segment(b, [0, 0.33, -0.5], [0, 0.33, -0.1], 0.015, 0.015, F, 5);
+      segment(b, [0, 0.33, 0.55], [0, 1.05, 0.42], 0.02, 0.02, F, 5); // fork
+      box(b, 0, 1.03, 0.42, 0.55, 0.03, 0.03, F); // handlebar
+      box(b, 0, 0.9, -0.18, 0.14, 0.05, 0.25, BLACK); // saddle
+      box(b, 0, 0.62, -0.45, 0.3, 0.03, 0.35, F); // carrier
+      rider(b, -0.2, 0.92, [0.95, 0.95, 0.95]);
+      break;
+    }
+    case 'suv-white': suv(b, [0.93, 0.93, 0.92]); break;
+    case 'suv-black': suv(b, [0.1, 0.1, 0.11]); break;
+    case 'tractor': {
+      const R = [0.75, 0.12, 0.1];
+      box(b, 0, 0.55, 0.6, 0.7, 0.6, 1.9, R); // bonnet
+      box(b, 0, 1.15, 0.85, 0.6, 0.12, 1.3, R);
+      segment(b, [0.2, 1.2, 1.2], [0.2, 2.0, 1.2], 0.05, 0.04, BLACK, 6); // exhaust
+      box(b, 0, 0.6, -0.65, 1.0, 0.5, 0.9, [0.3, 0.3, 0.32]); // body
+      box(b, 0, 1.2, -0.75, 0.45, 0.12, 0.4, BLACK); // seat
+      box(b, 0, 1.45, -0.45, 0.06, 0.4, 0.06, BLACK); // steering
+      for (const s of [-1, 1]) box(b, s * 0.82, 1.35, -0.75, 0.42, 0.06, 0.9, R); // mudguards
+      for (const s of [-1, 1]) wheel(b, s * 0.82, -0.75, 0.72, 0.4);
+      for (const s of [-1, 1]) wheel(b, s * 0.55, 1.2, 0.4, 0.2);
+      rider(b, -0.75, 1.25, [0.9, 0.9, 0.85]);
       break;
     }
     case 'ped-kurta': person(b, [0.85, 0.75, 0.45], [0.92, 0.9, 0.85], 'pants'); break;

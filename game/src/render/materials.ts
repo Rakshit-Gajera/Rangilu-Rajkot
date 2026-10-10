@@ -4,6 +4,7 @@ import * as THREE from 'three';
 export const worldUniforms = {
   uNight: { value: 0 }, // 0 day .. 1 full night
   uHour: { value: 18.5 }, // local time, hours
+  uWet: { value: 0 }, // 0 dry .. 1 soaked (monsoon rain, render/weather.ts)
 };
 
 /**
@@ -197,6 +198,7 @@ ${GLSL_COMMON}`)
 export function roadMaterial(): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   m.onBeforeCompile = (shader) => {
+    shader.uniforms.uWet = worldUniforms.uWet;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 attribute float surface; attribute vec2 fuv; varying float vSurface; varying vec2 vWuv;`)
@@ -204,7 +206,7 @@ attribute float surface; attribute vec2 fuv; varying float vSurface; varying vec
 vSurface = surface; vWuv = fuv;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
-varying float vSurface; varying vec2 vWuv;
+varying float vSurface; varying vec2 vWuv; uniform float uWet;
 ${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   int s = int(vSurface + 0.5);
@@ -214,9 +216,14 @@ ${GLSL_COMMON}`)
   if (s == 0) c = mix(c, vec3(0.30, 0.29, 0.28), patchy * 0.8); // patch repairs
   if (s == 1) c *= 1.0 - 0.12 * step(0.94, fract(vWuv.x * 0.25)) - 0.12 * step(0.94, fract(vWuv.y * 0.25)); // RCC joints
   if (s == 2) c *= 0.85 + 0.15 * step(0.12, fract(vWuv.x * 4.0)) * step(0.12, fract(vWuv.y * 2.0)); // paver blocks
-  diffuseColor.rgb = pow(c, vec3(2.2));`);
+  diffuseColor.rgb = pow(c, vec3(2.2));
+  // Wet: darker, with puddles in the low patches.
+  float puddle = smoothstep(0.55, 0.7, fNoise(vWuv * 0.21 + 3.0)) * uWet;
+  diffuseColor.rgb *= 1.0 - 0.4 * uWet - 0.2 * puddle;`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+  roughnessFactor = mix(roughnessFactor, 0.12, clamp(uWet * 0.75 + puddle, 0.0, 1.0));`);
   };
-  m.customProgramCacheKey = () => 'road-v1';
+  m.customProgramCacheKey = () => 'road-v2';
   return m;
 }
 
@@ -227,16 +234,19 @@ export function vertexColorMaterial(opts: THREE.MeshStandardMaterialParameters =
 export function grassMaterial(): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0x6e8a3e, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   m.onBeforeCompile = (shader) => {
+    shader.uniforms.uWet = worldUniforms.uWet;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec2 fuv; varying vec2 vWuv;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWuv = fuv;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec2 vWuv;\n${GLSL_COMMON}`)
+      .replace('#include <common>', `#include <common>\nvarying vec2 vWuv; uniform float uWet;\n${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   float g = fNoise(vWuv * 0.15) * 0.6 + fNoise(vWuv * 1.3) * 0.4;
-  diffuseColor.rgb = pow(mix(vec3(0.42, 0.48, 0.24), vec3(0.60, 0.56, 0.34), g), vec3(2.2)); // dry-season grass with bald patches`);
+  vec3 dry = mix(vec3(0.42, 0.48, 0.24), vec3(0.60, 0.56, 0.34), g); // dry-season grass with bald patches
+  vec3 lush = mix(vec3(0.20, 0.36, 0.12), vec3(0.30, 0.42, 0.17), g); // monsoon green
+  diffuseColor.rgb = pow(mix(dry, lush, uWet), vec3(2.2));`);
   };
-  m.customProgramCacheKey = () => 'grass-v1';
+  m.customProgramCacheKey = () => 'grass-v2';
   return m;
 }
 

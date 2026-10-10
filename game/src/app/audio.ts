@@ -1,4 +1,4 @@
-/** Minimal synthesised audio (CC0 by construction, PROMPT §9.7): scooter horn and engine hum. */
+/** Minimal synthesised audio (CC0 by construction, PROMPT §9.7): horns and engine hum. */
 export class Audio {
   private ctx: AudioContext | null = null;
   private engine: { osc: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
@@ -40,29 +40,81 @@ export class Audio {
     }
   }
 
-  /** Scooter horn: a bright two-tone beep. */
-  horn() {
+  /** The player's horn, by vehicle: scooter two-tone, auto "pom-pom", bus/tractor blare, bicycle bell. */
+  horn(kind = 'scooter') {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
-    gain.gain.setValueAtTime(0.18, t + 0.32);
-    gain.gain.linearRampToValueAtTime(0, t + 0.36);
-    gain.connect(ctx.destination);
-    for (const f of [440, 554]) {
-      const o = ctx.createOscillator();
-      o.type = 'square';
-      o.frequency.value = f;
-      o.connect(gain);
-      o.start(t);
-      o.stop(t + 0.37);
+    if (kind === 'bell') {
+      for (const t0 of [t, t + 0.18]) {
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.12, t0);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+        g.connect(ctx.destination);
+        for (const f of [2100, 2650]) {
+          const o = ctx.createOscillator();
+          o.type = 'sine';
+          o.frequency.value = f;
+          o.connect(g);
+          o.start(t0);
+          o.stop(t0 + 0.5);
+        }
+      }
+      return;
+    }
+    const tones: Record<string, [number[], number, number]> = { // freqs, beeps, length
+      scooter: [[440, 554], 1, 0.36], motorcycle: [[415, 523], 1, 0.36], auto: [[330], 2, 0.2],
+      car: [[370, 466], 1, 0.4], bus: [[196, 247], 1, 0.6],
+    };
+    const [freqs, beeps, len] = tones[kind] ?? tones.scooter;
+    for (let k = 0; k < beeps; k++) {
+      const t0 = t + k * (len + 0.05);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.18, t0 + 0.01);
+      gain.gain.setValueAtTime(0.18, t0 + len - 0.04);
+      gain.gain.linearRampToValueAtTime(0, t0 + len);
+      gain.connect(ctx.destination);
+      for (const f of freqs) {
+        const o = ctx.createOscillator();
+        o.type = 'square';
+        o.frequency.value = f;
+        o.connect(gain);
+        o.start(t0);
+        o.stop(t0 + len + 0.01);
+      }
     }
   }
 
-  /** Engine hum; rpm01 in 0..1, null to stop. */
-  setEngine(rpm01: number | null) {
+  private rain: GainNode | null = null;
+
+  /** Monsoon rain: looping filtered noise, level 0..1. */
+  setRain(level: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (!this.rain) {
+      if (level < 0.01) return;
+      const len = ctx.sampleRate * 2;
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let k = 0; k < len; k++) d[k] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 1800;
+      band.Q.value = 0.5;
+      this.rain = ctx.createGain();
+      this.rain.gain.value = 0;
+      src.connect(band).connect(this.rain).connect(ctx.destination);
+      src.start();
+    }
+    this.rain.gain.setTargetAtTime(level * 0.12, ctx.currentTime, 0.5);
+  }
+
+  /** Engine hum; rpm01 in 0..1 (null to stop); pitch scales the note (big engines are lower). */
+  setEngine(rpm01: number | null, pitch = 1) {
     const ctx = this.ctx;
     if (!ctx) return;
     if (rpm01 === null) {
@@ -93,8 +145,8 @@ export class Audio {
       this.engine = { osc, osc2, gain };
     }
     const t = ctx.currentTime;
-    this.engine.osc.frequency.setTargetAtTime(38 + rpm01 * 110, t, 0.08);
-    this.engine.osc2.frequency.setTargetAtTime(19 + rpm01 * 55, t, 0.08);
+    this.engine.osc.frequency.setTargetAtTime((38 + rpm01 * 110) * pitch, t, 0.08);
+    this.engine.osc2.frequency.setTargetAtTime((19 + rpm01 * 55) * pitch, t, 0.08);
     this.engine.gain.gain.setTargetAtTime(0.035 + rpm01 * 0.04, t, 0.1);
   }
 }

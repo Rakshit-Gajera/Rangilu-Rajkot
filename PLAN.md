@@ -1,6 +1,8 @@
 # Plan
 
-Current phase: **P4 — Life** (P3 items still open below)
+Current phase: **P5 — Sandbox and activities** (PROMPT.md §3.3–3.6, §9.8–9.10, §10). Gate: fun check by Rakshit.
+
+Previous: **P4 — Life** (core done; 4.5–4.7 continue inside P5)
 
 Previous: **P3 — Make it look like Rajkot** (PROMPT.md §13). Gate: ≥ 8/10 street screenshots recognised by Rakshit.
 
@@ -17,6 +19,20 @@ P2 gate passed (Rakshit, 2026-10-10).
 - [x] 2.8 Cross-city tour test: 17 km route + repeated city tour, no errors, no growth in memory
 - [x] 2.8b Independent review → fixes
 - [ ] 2.9 Rakshit: cross-city drive on his laptop (gate)
+
+## P5 tasks (started 2026-10-10 at Rakshit's request)
+- [x] 5.0 Fixes from Rakshit's test drive: detailed character, horn only on vehicles, scooter falling/vanishing,
+      people inside buildings, High/Ultra frame rate (tree LOD layer)
+- [ ] 5.1 Every vehicle drivable (bicycle, scooter, motorcycle, chhakdo, auto, hatchback, SUV, bus, tractor); take any traffic vehicle with E
+- [ ] 5.2 Sandbox menu (Tab): spawn vehicles and props (cones, ramps, barrels, stumps); sliders for time, date/season, weather, traffic, people
+- [ ] 5.3 Weather: clear, summer haze, monsoon rain with wet roads; rivers fill only in the monsoon
+- [ ] 5.4 Drone camera (free fly over the city) and photo mode (hide HUD, filters, depth of field)
+- [ ] 5.5 Discovery log: visiting a landmark unlocks a card with sourced facts; map teleport to discovered places
+- [ ] 5.6 Activities framework + ≥ 5 activities (rickshaw rides, farsan delivery, time trials, BRTS driver, kite fight / garba)
+- [ ] 5.7 Money (₹) from activities; outfits and food
+- [ ] 5.8 Saves: position, vehicle, outfit, money, discoveries, records, settings; export/import JSON
+- [ ] 5.9 Ambient audio (traffic hum, market chatter, temple bells, crickets) and signals at major junctions
+- [ ] 5.10 Review → gate (fun check)
 
 ## P4 tasks (started 2026-10-10 at Rakshit's request; P3 leftovers continue in parallel)
 - [x] 4.1 Traffic on the road graph: scooters, motorcycles, autos, chhakdos, cars, buses; keep-left, IDM spacing,

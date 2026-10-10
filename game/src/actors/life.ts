@@ -47,6 +47,10 @@ const VEHICLES: Spec[] = [
   { model: 'car-silver', weight: 6, length: 3.9, speed: 1.0, lane: 0.3 },
   { model: 'car-blue', weight: 3, length: 3.9, speed: 1.0, lane: 0.3 },
   { model: 'bus', weight: 2, length: 10.6, speed: 0.8, lane: 0.2 },
+  { model: 'bicycle', weight: 4, length: 1.7, speed: 0.4, lane: 1.0 },
+  { model: 'suv-white', weight: 3, length: 4.4, speed: 1.0, lane: 0.3 },
+  { model: 'suv-black', weight: 2, length: 4.4, speed: 1.0, lane: 0.3 },
+  { model: 'tractor', weight: 1, length: 3.6, speed: 0.5, lane: 0.4 },
 ];
 const VEHICLE_TOTAL = VEHICLES.reduce((s, v) => s + v.weight, 0);
 const PEDS: ModelName[] = ['ped-kurta', 'ped-shirt', 'ped-saree', 'ped-salwar'];
@@ -285,6 +289,28 @@ export class Life {
       this.syncBody(a, px, pn);
     }
     this.render();
+  }
+
+  /**
+   * Take the traffic vehicle nearest to (x, n) within `reach` metres of its body (the player hops on):
+   * it leaves traffic and its pose is returned for a drivable copy.
+   */
+  takeVehicle(x: number, n: number, reach = 1.5): { model: ModelName; x: number; n: number; y: number; yaw: number } | null {
+    let best = -1, bd = reach;
+    this.agents.forEach((a, k) => {
+      if (a.kind !== 'vehicle') return;
+      const d = Math.hypot(a.x - x, a.n - n) - a.length / 2;
+      if (d < bd) { bd = d; best = k; }
+    });
+    if (best < 0) return null;
+    const a = this.agents[best];
+    this.remove(best);
+    return { model: MODELS[a.model], x: a.x, n: a.n, y: a.y, yaw: a.yaw };
+  }
+
+  /** Is a traffic vehicle within reach (for the E prompt)? */
+  vehicleNear(x: number, n: number, reach = 1.5): boolean {
+    return this.agents.some((a) => a.kind === 'vehicle' && Math.hypot(a.x - x, a.n - n) - a.length / 2 < reach);
   }
 
   /** Remove the farthest agents of a kind above `cap`. */

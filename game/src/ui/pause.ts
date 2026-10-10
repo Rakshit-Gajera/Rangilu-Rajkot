@@ -23,9 +23,11 @@ export class PauseMenu {
         <h3>Controls</h3>
         <ul>
           <li><b>WASD</b> move / ride · <b>Shift</b> sprint · <b>Space</b> jump / brake</li>
-          <li><b>E</b> get on or off the scooter · <b>H</b> horn · <b>R</b> reset scooter</li>
+          <li><b>E</b> get on or off any vehicle (even one in traffic) · <b>H</b> horn</li>
+          <li><b>R</b> reset the vehicle; on foot, bring your scooter</li>
           <li><b>M</b> map: click to set a waypoint, <b>F</b> to fast travel</li>
-          <li><b>C</b> camera · <b>T</b> +1 hour · <b>F3</b> performance</li>
+          <li><b>Tab</b> sandbox: spawn vehicles and props, time, season, weather, traffic</li>
+          <li><b>P</b> photo mode · <b>C</b> camera · <b>T</b> +1 hour · <b>F3</b> performance</li>
         </ul>
       </div>`;
     document.body.appendChild(this.root);

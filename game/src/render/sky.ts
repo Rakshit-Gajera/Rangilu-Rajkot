@@ -151,6 +151,10 @@ export class Environment {
     scene.add(this.sun, this.sun.target);
   }
 
+  /** Weather inputs (render/weather.ts), 0..1. */
+  overcast = 0;
+  haze = 0;
+
   update(clock: Clock, focus: THREE.Vector3, camera: THREE.Camera) {
     const t = clock.instant();
     const sp = bodyPosition('sun', t);
@@ -160,6 +164,13 @@ export class Environment {
     const alt = sp.altitude;
 
     skyColors(alt, this.zen, this.hor);
+    // Monsoon clouds: a grey sky; summer haze: a dusty, washed-out horizon.
+    const lightness = Math.max(0.08, THREE.MathUtils.smoothstep(alt, -0.15, 0.3));
+    const grey = new THREE.Color(0.42, 0.45, 0.48).multiplyScalar(lightness);
+    this.zen.lerp(grey, this.overcast * 0.85);
+    this.hor.lerp(grey.multiplyScalar(1.25), this.overcast * 0.8);
+    this.hor.lerp(new THREE.Color(0.78, 0.68, 0.52).multiplyScalar(lightness), this.haze * 0.6);
+    this.zen.lerp(this.hor, this.haze * 0.35);
     const day = THREE.MathUtils.smoothstep(alt, -0.04, 0.25);
     const twilight = THREE.MathUtils.smoothstep(alt, -0.2, -0.02);
     const night = 1 - twilight;
@@ -172,7 +183,7 @@ export class Environment {
     u.uHorizon.value.copy(this.hor);
     u.uSunDir.value.copy(this.sunDir);
     u.uMoonDir.value.copy(this.moonDir);
-    u.uSunColor.value.setRGB(1, 0.85 - golden * 0.3, 0.65 - golden * 0.4);
+    u.uSunColor.value.setRGB(1, 0.85 - golden * 0.3, 0.65 - golden * 0.4).multiplyScalar(1 - 0.9 * this.overcast);
     u.uNight.value = night;
     this.dome.position.copy(camera.position);
 
@@ -189,7 +200,7 @@ export class Environment {
       this.sun.intensity = 0.35 * THREE.MathUtils.smoothstep(mp.altitude, 0.05, 0.4);
     } else {
       this.sun.color.setRGB(1, 0.93 - golden * 0.28, 0.84 - golden * 0.45);
-      this.sun.intensity = 3.0 * day;
+      this.sun.intensity = 3.0 * day * (1 - 0.8 * this.overcast) * (1 - 0.3 * this.haze);
     }
     // Sky light: strong blue-white by day, warm-violet at dusk, faint blue at night.
     this.hemi.color.copy(this.zen).lerp(this.hor, 0.45);
@@ -197,11 +208,11 @@ export class Environment {
     this.hemi.color.multiplyScalar(1 / peak); // colour only; brightness comes from intensity
     // Light bouncing up from dusty roads and plaster: near-neutral, so undersides (flyovers) read as grey concrete.
     this.hemi.groundColor.setRGB(0.6, 0.57, 0.52, THREE.SRGBColorSpace).multiplyScalar(0.3 + 0.7 * twilight);
-    this.hemi.intensity = 0.35 + 0.5 * twilight + 0.75 * day;
+    this.hemi.intensity = (0.35 + 0.5 * twilight + 0.75 * day) * (1 + 0.25 * this.overcast);
 
     // Haze matches the horizon so distant buildings melt into the sky.
     this.fog.color.copy(this.hor);
-    this.fog.density = 0.0006 + 0.0003 * golden;
+    this.fog.density = 0.0006 + 0.0003 * golden + 0.0022 * this.overcast + 0.0014 * this.haze;
     this.renderer.toneMappingExposure = 0.9 + 0.15 * night;
   }
 }
