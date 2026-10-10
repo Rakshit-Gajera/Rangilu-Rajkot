@@ -1,3 +1,5 @@
+import { readMaybeGzip } from './gunzip';
+
 /** City road graph from world/map.json.gz: map drawing + GPS routing (PROMPT §9.8). */
 
 export interface MapData {
@@ -134,8 +136,7 @@ export class RoadGraph {
   static async load(url: string): Promise<RoadGraph> {
     const r = await fetch(url);
     if (!r.ok || !r.body) throw new Error(`map ${url}: ${r.status}`);
-    const body = url.endsWith('.gz') ? r.body.pipeThrough(new DecompressionStream('gzip')) : r.body;
-    return new RoadGraph(await new Response(body).json());
+    return new RoadGraph(JSON.parse(new TextDecoder().decode(await readMaybeGzip(r))));
   }
 
   /** Routable edges leaving node u: [edge, forward] pairs (one-way streets only forward). */

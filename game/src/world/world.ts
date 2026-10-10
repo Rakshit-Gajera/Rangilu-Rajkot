@@ -8,6 +8,7 @@ import {
 } from '../render/materials';
 import { N_SPECIES, GULMOHAR, treeModel } from '../gen/trees';
 import { TreeLayer } from './treelayer';
+import { readMaybeGzip } from './gunzip';
 import { signAtlas, signMaterial } from '../render/signAtlas';
 import { WorkerPool } from './pool';
 import { heightAt } from './rtile';
@@ -265,9 +266,8 @@ export class World {
       return p;
     }
     p = fetch(`${this.base}/packs/${file}`).then(async (r) => {
-      if (!r.ok || !r.body) throw new Error(`pack ${file}: ${r.status}`);
-      const body = file.endsWith('.gz') ? r.body.pipeThrough(new DecompressionStream('gzip')) : r.body;
-      return new Response(body).arrayBuffer();
+      if (!r.ok) throw new Error(`pack ${file}: ${r.status}`);
+      return readMaybeGzip(r);
     });
     p.catch(() => this.packs.delete(file)); // allow a retry later
     this.packs.set(file, p);

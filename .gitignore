@@ -1,7 +1,10 @@
 # Raw and intermediate data (large, re-downloadable)
 /data/
-# Generated world package
-/world/
+# Generated world package: the playable data (packs, manifest, map) IS committed so Cloudflare Pages can
+# serve it without re-baking; the debug preview and private places never are.
+/world/preview/
+/world/private.local.json
+/world/*.local.json
 # Private, per-machine config (e.g. owner's home location) — never commit
 pipeline/local.yaml
 
