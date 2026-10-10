@@ -60,6 +60,13 @@ async function main() {
       Promise.all([document.fonts.load('700 20px "Noto Sans"', 'A'), document.fonts.load('600 20px "Noto Sans Gujarati"', 'શ્રી')]),
       new Promise((r) => setTimeout(r, 3000)),
     ]);
+  } catch { /* fonts unavailable: fall back to system fonts */ }
+  // Signboards are drawn with Noto Sans / Noto Sans Gujarati; wait briefly for them (system fonts otherwise).
+  try {
+    await Promise.race([
+      Promise.all([document.fonts.load('700 20px "Noto Sans"', 'A'), document.fonts.load('600 20px "Noto Sans Gujarati"', 'શ્રી')]),
+      new Promise((r) => setTimeout(r, 3000)),
+    ]);
   } catch { /* fonts unavailable: fall back */ }
   const world = await World.load('world', physics, shadowSize > 0, quality.stream);
   scene.add(world.root);
