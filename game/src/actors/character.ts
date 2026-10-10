@@ -23,6 +23,8 @@ export const OUTFITS: Record<string, Outfit> = {
 export type Pose = 'stand' | 'ride';
 
 const SKIN = 0x8a5a3c;
+/** Skin tones offered in character setup. */
+export const SKIN_TONES = [0xc68e65, 0xa8714d, 0x8a5a3c, 0x6e4529, 0x4e3020];
 
 export class Character {
   readonly root = new THREE.Group();
@@ -35,6 +37,7 @@ export class Character {
   private hip: THREE.Group[] = [];
   private knee: THREE.Group[] = [];
   private ankle: THREE.Group[] = [];
+  private skin: THREE.MeshStandardMaterial;
   private mats: { top: THREE.MeshStandardMaterial; bottom: THREE.MeshStandardMaterial; shoes: THREE.MeshStandardMaterial };
   private styleParts: Record<OutfitStyle, THREE.Object3D[]> = { shirt: [], kurta: [], tshirt: [] };
   private sleeves: THREE.Mesh[] = [];
@@ -45,7 +48,7 @@ export class Character {
 
   constructor(outfit: Outfit = OUTFITS.casual) {
     const std = (color: number, roughness = 0.8) => new THREE.MeshStandardMaterial({ color, roughness });
-    const skin = std(SKIN, 0.65);
+    const skin = (this.skin = std(SKIN, 0.65));
     const hair = std(0x15100c, 0.55);
     const white = std(0xf4f1ea, 0.4);
     const dark = std(0x1a1210, 0.4);
@@ -163,6 +166,11 @@ export class Character {
       this.ankle.push(an);
     }
     this.setOutfit(outfit);
+  }
+
+  /** Skin tone (title-screen character setup). */
+  setSkin(hex: number) {
+    this.skin.color.setHex(hex);
   }
 
   setOutfit(o: Outfit) {

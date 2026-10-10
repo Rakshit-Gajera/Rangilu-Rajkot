@@ -7,7 +7,9 @@ import { Props } from './actors/props';
 import { Weather, type WeatherKind } from './render/weather';
 import { PhotoMode } from './ui/photo';
 import { FOOD_SHOP, OUTFIT_SHOP, SandboxMenu, type SandboxHooks } from './ui/sandbox';
-import { OUTFITS } from './actors/character';
+import { OUTFITS, SKIN_TONES } from './actors/character';
+import { setLang, t } from './app/i18n';
+import { TitleScreen } from './ui/title';
 import type { ActivityContext } from './activities/activity';
 import { Activities } from './activities/manager';
 import { exportSave, freshSave, importSave, loadSave, storeSave } from './app/save';
@@ -15,7 +17,7 @@ import { DiscoveryLog } from './ui/discovery';
 import { Credits } from './ui/credits';
 import { Onboarding } from './ui/onboarding';
 import { enableTouch, isTouchDevice } from './app/touch';
-import { loadSettings, type Settings } from './app/settings';
+import { loadSettings, storeSettings, type Settings } from './app/settings';
 import { kindOfModel, SPECS, type Vehicle, type VehicleKind } from './actors/vehicle';
 import { Audio } from './app/audio';
 import { Input } from './app/input';
@@ -150,6 +152,9 @@ async function main() {
 
   // --- Map, GPS and fast travel (PROMPT §3.5, §9.8). The game still works if the map fails to load.
   // Settings (Esc menu): volume, mouse, field of view, key hints.
+  // The title screen (created further down) resolves this when you press Play.
+  let titleDoneResolve: () => void = () => {};
+  const titleDone = new Promise<void>((r) => (titleDoneResolve = r));
   const settings = loadSettings();
   function applySettings(s: Settings) {
     audio.setVolume(s.volume);
@@ -161,7 +166,7 @@ async function main() {
   applySettings(settings);
   const touch = isTouchDevice() || params.get('touch') === '1';
   if (touch) { enableTouch(input); document.body.classList.add('touch'); }
-  const onboarding = new Onboarding(touch, (t) => hud.flash(t), useHome);
+  const onboarding = new Onboarding(touch, (msg) => hud.flash(msg), useHome, titleDone);
   const pause = new PauseMenu(quality.name, {
     exportSave: () => { writeSave(); exportSave(save); },
     importSave: () => {
@@ -462,7 +467,7 @@ async function main() {
         hud.setMoney(save.money);
       }
       save.outfit = id;
-      player.character.setOutfit(OUTFITS[id]);
+      wearOutfit(id);
       return `Wearing: ${item.label}`;
     },
     food: (id) => {
@@ -477,7 +482,32 @@ async function main() {
     },
     shopState: () => ({ money: save.money, owned: save.owned, wearing: save.outfit }),
   };
-  if (OUTFITS[save.outfit]) player.character.setOutfit(OUTFITS[save.outfit]);
+  /** Wear an outfit; the casual one uses the shirt colour picked on the title screen. */
+  function wearOutfit(id: string) {
+    const o = OUTFITS[id] ?? OUTFITS.casual;
+    player.character.setOutfit(id === 'casual' ? { ...o, top: settings.shirt } : o);
+  }
+  wearOutfit(save.outfit);
+  player.character.setSkin(SKIN_TONES[settings.skin] ?? SKIN_TONES[2]);
+  setLang(settings.lang);
+  document.getElementById('help')!.textContent = t('help');
+
+  // Title screen (PROMPT §3.1): a drone shot over the Race Course ring until you press Play.
+  const raceCourse = graph?.data.labels.find((l) => l.id === 'race_course') ?? { x: -1000, n: 600 };
+  const title = navigator.webdriver || params.get('title') === '0' ? null
+    : new TitleScreen(settings, player.character, (st) => { storeSettings(st); document.getElementById('help')!.textContent = t('help'); });
+  if (!title) titleDoneResolve();
+  if (title) {
+    document.getElementById('hud')!.hidden = true;
+    void world.ensure(raceCourse.x, -raceCourse.n, 300);
+    void title.wait().then(() => {
+      titleDoneResolve();
+      fixedView = null;
+      document.getElementById('hud')!.hidden = false;
+      wearOutfit(save.outfit);
+      hud.flash(`${t('welcome')}${settings.name ? `, ${settings.name}` : ''}!`);
+    });
+  }
   const sandbox = new SandboxMenu(sandboxHooks);
   // Pick up where you left off (unless a test pins the start).
   if (!params.has('hour') && save.pos && !useHome) {
@@ -523,6 +553,15 @@ async function main() {
     tMark = tFrame;
 
     // --- Input-driven actions -------------------------------------------------
+    input.poll();
+    if (title?.open) {
+      const a = now / 1000 * 0.04;
+      const gy0 = world.terrainAt(raceCourse.x, -raceCourse.n) ?? 30;
+      fixedView = {
+        pos: new THREE.Vector3(raceCourse.x + Math.cos(a) * 420, gy0 + 170, -raceCourse.n + Math.sin(a) * 420),
+        look: new THREE.Vector3(raceCourse.x, gy0, -raceCourse.n),
+      };
+    }
     if (!cityMap?.open && input.hit('Escape')) {
       // Esc backs out of the innermost thing: photo/drone, then the sandbox menu, then pauses.
       if (camMode !== 'follow') setCamMode('follow');
@@ -543,7 +582,7 @@ async function main() {
     if (!mapOpen && !sandbox.open && input.hit('KeyP')) setCamMode('photo');
     if (camMode === 'photo') for (const code of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'KeyF', 'Enter']) if (input.hit(code)) photo.key(code);
     const freeCam = camMode === 'drone' ? drone : camMode === 'photo' ? photoCam : null;
-    const menuOpen = sandbox.open || !!activities?.open || discovery.open || onboarding.blocking || credits.open;
+    const menuOpen = !!title?.open || sandbox.open || !!activities?.open || discovery.open || onboarding.blocking || credits.open;
     onboarding.update(dt);
     const controls = mapOpen || traveling || menuOpen || freeCam ? null : input;
     // Something to get on: a parked vehicle of ours, or one from traffic (PROMPT §3.3: take any vehicle).

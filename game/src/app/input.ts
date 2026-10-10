@@ -2,6 +2,9 @@
 export class Input {
   private down = new Set<string>();
   private pressed = new Set<string>();
+  /** Keys currently held by a gamepad (kept apart so the pad never releases a keyboard key). */
+  private padDown = new Set<string>();
+  gamepad = false;
   mouseDX = 0;
   mouseDY = 0;
   wheel = 0;
@@ -38,7 +41,36 @@ export class Input {
   }
 
   held(code: string) {
-    return this.down.has(code);
+    return this.down.has(code) || this.padDown.has(code);
+  }
+
+  /**
+   * Gamepad (standard mapping, PROMPT §9.9), polled once per frame: left stick / triggers drive, right
+   * stick looks; A jump/brake, Y get on/off, X horn, B reset, Back map, Start menu, LB activities, RB sandbox,
+   * L3 sprint, R3 camera, D-pad up photo, D-pad down discovery log.
+   */
+  poll() {
+    const pads = navigator.getGamepads?.() ?? [];
+    const pad = [...pads].find((p) => p && p.connected && p.mapping === 'standard') ?? null;
+    const next = new Set<string>();
+    if (pad) {
+      this.gamepad = true;
+      const [lx, ly, rx, ry] = pad.axes;
+      const dz = 0.3;
+      const btn = (k: number) => !!pad.buttons[k]?.pressed;
+      if (ly < -dz || (pad.buttons[7]?.value ?? 0) > 0.2) next.add('KeyW');
+      if (ly > dz || (pad.buttons[6]?.value ?? 0) > 0.2) next.add('KeyS');
+      if (lx < -dz) next.add('KeyA');
+      if (lx > dz) next.add('KeyD');
+      const look = (v: number) => (Math.abs(v) > 0.12 ? Math.sign(v) * (Math.abs(v) - 0.12) * 22 : 0);
+      this.mouseDX += look(rx);
+      this.mouseDY += look(ry);
+      const map: [number, string][] = [[0, 'Space'], [3, 'KeyE'], [2, 'KeyH'], [1, 'KeyR'], [8, 'KeyM'], [9, 'Escape'],
+        [4, 'KeyJ'], [5, 'Tab'], [10, 'ShiftLeft'], [11, 'KeyC'], [12, 'KeyP'], [13, 'KeyL']];
+      for (const [k, code] of map) if (btn(k)) next.add(code);
+    }
+    for (const code of next) if (!this.padDown.has(code) && !this.down.has(code)) this.pressed.add(code);
+    this.padDown = next;
   }
 
   /** True once per key press. */

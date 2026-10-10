@@ -23,7 +23,7 @@ export class Onboarding {
   private tips: readonly (readonly [number, string])[];
   active: boolean;
 
-  constructor(touch: boolean, private flash: (text: string) => void, home: boolean) {
+  constructor(touch: boolean, private flash: (text: string) => void, home: boolean, after?: Promise<void>) {
     this.tips = touch ? TIPS_TOUCH : TIPS_KEYS;
     let seen = false;
     try { seen = localStorage.getItem(KEY) === '1'; } catch { /* no storage */ }
@@ -41,6 +41,11 @@ export class Onboarding {
       </ul>
       <button>Let's go</button></div>`;
     document.body.appendChild(this.card);
+    if (after) {
+      // Wait for the title screen.
+      this.card.hidden = true;
+      void after.then(() => { if (this.card) this.card.hidden = false; });
+    }
     this.card.querySelector('button')!.addEventListener('click', () => this.close());
   }
 
@@ -50,7 +55,7 @@ export class Onboarding {
     try { localStorage.setItem(KEY, '1'); } catch { /* fine */ }
   }
 
-  get blocking() { return !!this.card; }
+  get blocking() { return !!this.card && !this.card.hidden; }
 
   update(dt: number) {
     if (!this.active || this.card) return;
