@@ -16,6 +16,8 @@ const CLEAR_ENDS = 12; // keep junctions clear
 export interface FurnitureMeshes {
   solid: GeoBuf;
   lamps: GeoBuf;
+  /** Ground quads under lamps (uv 0..1 across the pool) for the additive light-pool material. */
+  pools: GeoBuf;
   /** Poles as collision boxes. */
   collider: { position: Float32Array; index: Uint32Array };
 }
@@ -46,6 +48,7 @@ const inTile = (x: number, n: number) => x >= 0 && x < 500 && n >= 0 && n < 500;
 export function furnitureMeshes(tile: Tile): FurnitureMeshes {
   const solid = new Builder(false, { color: 3 });
   const lamps = new Builder(false, { color: 3 });
+  const pools = new Builder(true);
   const col = new Builder(false);
   const islands = tile.chowks.filter((c) => c.island);
   const nearIsland = (x: number, n: number) => islands.some((c) => Math.hypot(c.x - x, c.n - n) < 30);
@@ -57,7 +60,7 @@ export function furnitureMeshes(tile: Tile): FurnitureMeshes {
     else if (r.rank >= 3 && r.surface !== 3) electricPoles(r, phase);
   }
   const c = col.build();
-  return { solid: solid.build(), lamps: lamps.build(), collider: { position: c.position, index: c.index } };
+  return { solid: solid.build(), lamps: lamps.build(), pools: pools.build(), collider: { position: c.position, index: c.index } };
 
   function poleCollider(x: number, y: number, z: number, h: number) {
     box(col, x, y, z, 0.35, h, 0.35, [0, 0, 0]);
@@ -78,6 +81,13 @@ export function furnitureMeshes(tile: Tile): FurnitureMeshes {
       segment(solid, [x, y + 8.3, z], [ax, y + 8.7, az], 0.05, 0.05, LIGHT_POLE, 4, false);
       box(solid, ax, y + 8.45, az, 0.7, 0.18, 0.32, LAMP_HEAD, Math.atan2(p.dx, p.dn));
       box(lamps, ax, y + 8.4, az, 0.55, 0.06, 0.24, LAMP_GLOW, Math.atan2(p.dx, p.dn));
+      // Pool of light on the road under the lamp (follows the ground at its corners).
+      const R = 9;
+      const corners = [[-R, -R, 0, 0], [R, -R, 1, 0], [R, R, 1, 1], [-R, R, 0, 1]].map(([dx, dz, u, v]) => {
+        const gx = ax + dx, gz = az + dz;
+        return pools.vertex(gx, heightAt(tile, gx, -gz) + 0.12, gz, 0, 1, 0, u, v);
+      });
+      pools.quad(corners[0], corners[3], corners[2], corners[1]);
       poleCollider(x, y, z, 8.5);
     }
   }

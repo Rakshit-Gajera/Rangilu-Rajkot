@@ -1,0 +1,14 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 960, height: 540 } });
+await p.goto('http://localhost:5173/?shadows=0&date=2026-10-09');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 120000 });
+const [x, n] = await p.evaluate(() => window.__game.roadNear(-1100, 520));
+await p.evaluate(([x, n]) => window.__game.ensure(x, -n, 300), [x, n]);
+const y = await p.evaluate(([x, n]) => window.__game.terrain(x, -n), [x, n]);
+await p.evaluate(([x, y, n]) => window.__game.setView([x, y + 3, -n], [x - 60, y + 1, -n + 40], 21), [x, y, n]);
+await p.waitForTimeout(1000);
+await p.waitForFunction(() => window.__game.idle(), null, { timeout: 120000 });
+await p.waitForTimeout(800);
+await p.screenshot({ path: '../shots/42-night-street-lights.png' });
+await b.close();

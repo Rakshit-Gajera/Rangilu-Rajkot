@@ -65,7 +65,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   });
   const geos = [terrain, buildings.walls, buildings.roofs, buildings.props, roads.surfaces, roads.markings,
     roads.bridges, areas.grass, areas.water, areas.sand, chowks.solid, chowks.deco, chowks.lamps,
-    furniture.solid, furniture.lamps];
+    furniture.solid, furniture.lamps, furniture.pools];
   // Generators write vertex colours as sRGB; three.js shades in linear space.
   for (const g of geos) {
     const c = g.attrs.color?.[0];
@@ -84,7 +84,7 @@ export function tileTransferables(b: TileBuild): ArrayBuffer[] {
   const out: ArrayBuffer[] = [b.heights.buffer as ArrayBuffer];
   for (const g of [b.terrain, b.buildings.walls, b.buildings.roofs, b.buildings.props, b.roads.surfaces,
     b.roads.markings, b.roads.bridges, b.areas.grass, b.areas.water, b.areas.sand, b.chowks.solid, b.chowks.deco,
-    b.chowks.lamps, b.furniture.solid, b.furniture.lamps, b.signs.mesh]) transferables(g, out);
+    b.chowks.lamps, b.furniture.solid, b.furniture.lamps, b.furniture.pools, b.signs.mesh]) transferables(g, out);
   for (const c of [b.buildings.collider, b.roads.bridgeCollider]) out.push(c.position.buffer as ArrayBuffer, c.index.buffer as ArrayBuffer);
   for (const r of b.minimapRoads) out.push(r.buffer as ArrayBuffer);
   for (const t of b.trees) out.push(t.buffer as ArrayBuffer);

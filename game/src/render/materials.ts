@@ -263,3 +263,15 @@ export function lampMaterial(): THREE.MeshStandardMaterial {
   m.customProgramCacheKey = () => 'lamp-v1';
   return m;
 }
+
+/** Warm pool of street light on the ground: additive, radial falloff, only at night. */
+export function lightPoolMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uNight: worldUniforms.uNight },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform float uNight; varying vec2 vUv; void main() { float d = length(vUv - 0.5) * 2.0;' +
+      ' float a = pow(clamp(1.0 - d, 0.0, 1.0), 1.6) * uNight * 0.35; gl_FragColor = vec4(vec3(1.0, 0.78, 0.48) * a, 1.0); }',
+  });
+}
