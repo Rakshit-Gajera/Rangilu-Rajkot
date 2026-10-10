@@ -25,13 +25,13 @@ P2 gate passed (Rakshit, 2026-10-10).
       people inside buildings, High/Ultra frame rate (tree LOD layer)
 - [x] 5.1 Every vehicle drivable (bicycle, scooter, motorcycle, chhakdo, auto, hatchback, SUV, bus, tractor); take any traffic vehicle with E
 - [x] 5.2 Sandbox menu (Tab): spawn vehicles and props (cones, ramps, barrels, stumps); sliders for time, date/season, weather, traffic, people
-- [x] 5.3 Weather: clear, summer haze, monsoon rain with wet roads (rivers filling only in the monsoon: still to do)
+- [x] 5.3 Weather: clear, summer haze, monsoon rain with wet roads; Aji/Nyari riverbeds fill July–September or in heavy rain
 - [x] 5.4 Drone camera (free fly over the city) and photo mode (hide HUD, filters, depth of field)
 - [x] 5.5 Discovery log: visiting a landmark unlocks a card with sourced facts; map teleport to discovered places
 - [x] 5.6 Activities framework + 5 activities: rickshaw rides, farsan delivery, Race Course time trial, BRTS driver, Navratri garba
 - [ ] 5.7 Money (₹) from activities and discoveries (done); spend it on outfits and food (to do)
 - [x] 5.8 Saves: position, vehicle, outfit, money, discoveries, records, settings; export/import JSON
-- [ ] 5.9 Ambient audio (traffic hum, market chatter, temple bells, crickets) and signals at major junctions
+- [x] 5.9 Ambient audio (traffic hum, market chatter, birds, temple bells at aarti, crickets) and signals at 43 major junctions (traffic stops on red)
 - [ ] 5.10 Review → gate (fun check)
 
 ## P4 tasks (started 2026-10-10 at Rakshit's request; P3 leftovers continue in parallel)

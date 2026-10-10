@@ -1,6 +1,9 @@
 /** Minimal synthesised audio (CC0 by construction, PROMPT §9.7): horns and engine hum. */
+import { Ambience, type AmbienceLevels } from './ambience';
+
 export class Audio {
   private ctx: AudioContext | null = null;
+  private amb: Ambience | null = null;
   private engine: { osc: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
 
   /** Must be called from a user gesture. */
@@ -84,6 +87,13 @@ export class Audio {
         o.stop(t0 + len + 0.01);
       }
     }
+  }
+
+  /** City ambience levels for this frame (started lazily after the first user gesture). */
+  ambience(dt: number, levels: AmbienceLevels) {
+    if (!this.ctx) return;
+    this.amb ??= new Ambience(this.ctx);
+    this.amb.update(dt, levels);
   }
 
   /** Short UI cues for activities: ding (checkpoint), good (paid), bad (late). */

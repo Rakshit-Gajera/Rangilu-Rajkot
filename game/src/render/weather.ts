@@ -72,7 +72,8 @@ export class Weather {
     }
   }
 
-  update(dt: number, camera: THREE.Camera) {
+  /** month: 0–11 (the season fills the rivers from July to September). */
+  update(dt: number, camera: THREE.Camera, month = 9) {
     this.time += dt;
     const k = 1 - Math.exp(-dt / 4); // ~4 s blend
     const toward = (v: number, t: number) => v + (t - v) * k;
@@ -82,6 +83,8 @@ export class Weather {
     // Roads get wet quickly in rain and dry slowly after it.
     this.wet = this.kind === 'rain' ? Math.min(1, this.wet + dt / 8) : Math.max(0, this.wet - dt / 90);
     worldUniforms.uWet.value = this.wet;
+    const season = month >= 6 && month <= 8 ? 1 : month === 5 || month === 9 ? 0.35 : 0;
+    worldUniforms.uRiver.value = Math.max(season, this.wet * 0.85);
     this.streaks.visible = this.rain > 0.02;
     this.mat.uniforms.uTime.value = this.time;
     this.mat.uniforms.uAmount.value = this.rain;

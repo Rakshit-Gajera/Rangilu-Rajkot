@@ -5,6 +5,7 @@ Output world/map.json.gz:
   edges:  parallel arrays a, b, rank, flags (bit0 one-way a->b, bit1 bridge), name (strings index or -1),
           length (dm), carriageway width (dm), and polyline points (offsets into `pts`, flat [x, n, ...] metres, simplified 2 m)
   labels: [{t, x, n, kind}] neighbourhoods and landmarks
+  chowks: [[x, n], ...] every roundabout island centre
 The road graph doubles as the map layer, so the map draws exactly what GPS routes on.
 """
 
@@ -95,9 +96,15 @@ def run(cfg: C.Config) -> None:
         labels.append({"t": m["name"], "gu": None, "x": round(g.x - ox), "n": round(g.y - oy), "kind": "landmark",
                        "id": m["id"]})
 
+    chowk_xy = []  # every chowk (roundabout island or statue plinth), named or not: no traffic signals there
     for _, ck in gpd.read_parquet(C.interim("chowks.parquet")).iterrows():
+        c = ck.geometry.centroid
+        chowk_xy.append([round(c.x - ox), round(c.y - oy)])
+    # Roundabout ways whose island didn't close into a polygon still mark a chowk.
+    for g in roads.geometry.values[roads.roundabout.fillna(False).astype(bool).values]:
+        c = g.centroid
+        chowk_xy.append([round(c.x - ox), round(c.y - oy)])
         if isinstance(ck["name"], str):
-            c = ck.geometry.centroid
             labels.append({"t": ck["name"], "gu": None, "x": round(c.x - ox), "n": round(c.y - oy), "kind": "chowk"})
 
     data = {
@@ -107,6 +114,7 @@ def run(cfg: C.Config) -> None:
                   "width": ewidth},
         "pts": pts,
         "labels": labels,
+        "chowks": chowk_xy,
         "bounds": [round(v) for v in np.asarray(bounds["playable"].bounds) - (ox, oy, ox, oy)],
         "playable": [np.round(np.asarray(r.coords) - (ox, oy)).astype(int).ravel().tolist()
                      for g in getattr(shapely.simplify(bounds["playable"], 20), "geoms", [shapely.simplify(bounds["playable"], 20)])

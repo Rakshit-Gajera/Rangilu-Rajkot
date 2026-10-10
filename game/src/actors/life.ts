@@ -4,6 +4,7 @@ import { MODELS, vehicleModel, type ModelName } from '../gen/vehicles';
 import { GROUP_PLAYER, GROUP_VEHICLE, GROUP_WORLD, groups, type Physics } from '../physics/physics';
 import { vertexColorMaterial } from '../render/materials';
 import type { RoadGraph } from '../world/roadgraph';
+import type { Signals } from '../world/signals';
 import type { World } from '../world/world';
 
 /**
@@ -187,6 +188,9 @@ export class Life {
     return true;
   }
 
+  /** Traffic signals (world/signals.ts), if any. */
+  signals: Signals | null = null;
+
   /** Sandbox sliders (PROMPT §3.5): 0..2 multipliers on the preset caps. */
   trafficScale = 1;
   pedScale = 1;
@@ -252,6 +256,13 @@ export class Life {
         }
         // Slow down before the end of the edge (junctions).
         const toEnd = L - a.s;
+        // Red light ahead: stop at the line (unless too close to stop safely on amber).
+        if (this.signals && toEnd < 40 && toEnd > 3) {
+          const e = this.graph.data.edges;
+          const node = a.fwd ? e.b[a.edge] : e.a[a.edge];
+          const g = toEnd - 5;
+          if (this.signals.stopFor(node, hx, hn) && (a.v * a.v) / (2 * Math.max(g, 0.1)) < 4.5 && g < gap) { gap = Math.max(g, 0.1); dv = a.v; }
+        }
         let v0 = a.v0;
         if (toEnd < 18) v0 = Math.min(v0, 3 + toEnd * 0.35);
         const acc = idm(a.v, v0, gap, dv);
@@ -306,6 +317,16 @@ export class Life {
     const a = this.agents[best];
     this.remove(best);
     return { model: MODELS[a.model], x: a.x, n: a.n, y: a.y, yaw: a.yaw };
+  }
+
+  /** How many vehicles and people are within r metres of (x, n) (ambience). */
+  near(x: number, n: number, r: number): { vehicles: number; peds: number } {
+    let vehicles = 0, peds = 0;
+    for (const a of this.agents) {
+      if (Math.abs(a.x - x) > r || Math.abs(a.n - n) > r) continue;
+      if (a.kind === 'vehicle') vehicles++; else if (a.kind === 'ped') peds++;
+    }
+    return { vehicles, peds };
   }
 
   /** Is a traffic vehicle within reach (for the E prompt)? */

@@ -5,6 +5,7 @@ export const worldUniforms = {
   uNight: { value: 0 }, // 0 day .. 1 full night
   uHour: { value: 18.5 }, // local time, hours
   uWet: { value: 0 }, // 0 dry .. 1 soaked (monsoon rain, render/weather.ts)
+  uRiver: { value: 0 }, // 0 dry riverbeds .. 1 rivers flowing (monsoon months or heavy rain)
 };
 
 /**
@@ -254,8 +255,20 @@ export function waterMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color: 0x3d5a5c, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.92 });
 }
 
+/** Riverbeds (Aji, Nyari): dry sand most of the year, muddy flowing water in the monsoon (uRiver). */
 export function sandMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: 0x9c8a68, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const m = new THREE.MeshStandardMaterial({ color: 0x9c8a68, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uRiver = worldUniforms.uRiver;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uRiver;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.12, 0.07), uRiver);`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+  roughnessFactor = mix(roughnessFactor, 0.08, uRiver);`);
+  };
+  m.customProgramCacheKey = () => 'riverbed-v1';
+  return m;
 }
 
 /** Far-LOD tiles: vertex colours, cheap Lambert shading, and a faint glow of lit windows at night. */

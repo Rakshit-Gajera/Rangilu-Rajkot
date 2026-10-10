@@ -21,6 +21,7 @@ import { Clock, Environment, goldenHour } from './render/sky';
 import { Hud } from './ui/hud';
 import { CityMap } from './ui/map';
 import { Life } from './actors/life';
+import { Signals } from './world/signals';
 import { PauseMenu } from './ui/pause';
 import { distanceToPolyline, RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
@@ -153,6 +154,10 @@ async function main() {
   // Traffic, pedestrians and cows on the real road network (PROMPT §3.4).
   const life = graph ? new Life(graph, world, physics, scene, quality.life, shadowSize > 0) : null;
   if (life) life.onHorn = (x, y, z, kind) => audio.hornAt(here().distanceTo(new THREE.Vector3(x, y, z)), kind);
+  // Signals at major junctions (not at roundabouts/chowks).
+  const signals = graph ? new Signals(graph, scene, [
+    ...graph.data.labels.filter((l) => l.kind === 'chowk'), ...(graph.data.chowks ?? []).map(([x, n]) => ({ x, n }))]) : null;
+  if (life) life.signals = signals;
   const cityMap = graph ? new CityMap(graph, {
     player: () => { const p = here(); return { x: p.x, n: -p.z, heading: -follow.yaw }; },
     onWaypoint: () => { routeTimer = 0; },
@@ -481,6 +486,7 @@ async function main() {
     if (life) life.update(dt, here(), clock.hours, [here(), ...garage.parked()]);
     lifeMs = lifeMs * 0.95 + (performance.now() - tLife) * 0.05;
     keepAboveGround();
+    if (signals) { const h = here(); signals.update(dt, h.x, -h.z, (x, n) => world.terrainAt(x, -n)); }
     if (!traveling) {
       const h = here();
       discovery.update(h.x, -h.z, dt);
@@ -508,10 +514,15 @@ async function main() {
         : {});
     }
     mark('visuals');
-    weather.update(dt, camera);
+    weather.update(dt, camera, clock.date.getUTCMonth());
     env.overcast = weather.overcast;
     env.haze = weather.haze;
     audio.setRain(weather.rain);
+    {
+      const h = here(), c = life?.near(h.x, -h.z, 70) ?? { vehicles: 0, peds: 0 };
+      audio.ambience(dt, { traffic: Math.min(1, c.vehicles / 14), crowd: Math.min(1, c.peds / 14), night: worldUniforms.uNight.value,
+        hour: clock.hours, rain: weather.rain });
+    }
     env.update(clock, fixedView ? fixedView.look : freeCam ? camera.position : focus, camera);
     mark('env');
     {
@@ -607,6 +618,7 @@ async function main() {
     },
     agents: () => (life?.agents ?? []).map((a) => ({ kind: a.kind, x: a.x, n: a.n, y: a.y, yaw: a.yaw, v: a.v })),
     debugScene: () => { const out: Record<string, number> = {}; scene.traverse((o) => { const mm = o as THREE.Mesh; if (mm.isMesh) { const k = (mm.material as THREE.Material).type + ((mm.material as THREE.MeshStandardMaterial).map ? ":map" : "") + (mm.visible ? "" : ":hidden") + ((mm.material as THREE.MeshStandardMaterial).map ? "@" + mm.parent?.name : ""); out[k] = (out[k] ?? 0) + 1; } }); return out; },
+    signals: () => ({ count: signals?.junctions.length ?? 0, near: (signals?.junctions ?? []).map((j) => [Math.round(j.x), Math.round(j.n)]).sort((a, b) => Math.hypot(a[0] - here().x, a[1] + here().z) - Math.hypot(b[0] - here().x, b[1] + here().z)).slice(0, 3) }),
     roadNear: (x: number, n: number) => (graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n]),
     idle: () => world.stats().queued === 0,
     heap: () => (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0,

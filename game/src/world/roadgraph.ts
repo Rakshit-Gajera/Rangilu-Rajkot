@@ -8,6 +8,8 @@ export interface MapData {
   labels: { t: string; gu: string | null; x: number; n: number; kind: string; id?: string }[];
   bounds: [number, number, number, number];
   playable: number[][];
+  /** Every roundabout island centre [x, n] (newer maps). */
+  chowks?: number[][];
 }
 
 export const ONEWAY = 1;
