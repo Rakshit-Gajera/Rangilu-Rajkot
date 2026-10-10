@@ -2,6 +2,7 @@ import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
 import { join, normalize, resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import type { Plugin } from 'vite';
+import wasm from 'vite-plugin-wasm';
 
 const WORLD = resolve(import.meta.dirname, '../world');
 
@@ -31,8 +32,8 @@ function worldPackage(): Plugin {
 
 export default defineConfig({
   base: './',
-  plugins: [worldPackage()],
-  worker: { format: 'es' },
+  plugins: [wasm(), worldPackage()],
+  worker: { format: 'es', plugins: () => [wasm()] },
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
   server: { port: 5173 },
   test: { include: ['tests/**/*.test.ts'] },

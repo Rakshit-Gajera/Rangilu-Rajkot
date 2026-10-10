@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { heightfieldData } from '../src/physics/physics';
+import { heightfieldData } from '../src/physics/heightfield';
 import { heightAt } from '../src/world/rtile';
 
 describe('terrain heightfield collider', () => {
