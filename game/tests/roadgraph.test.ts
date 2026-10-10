@@ -48,3 +48,30 @@ describe.skipIf(!hasWorld)('world package', () => {
     expect(manifest.map).toBe('map.json.gz');
   });
 });
+
+describe.skipIf(!hasWorld)('nearest node', () => {
+  it('grid lookup matches a brute-force scan and is fast', () => {
+    const raw = gunzipSync(readFileSync(resolve(WORLD, 'map.json.gz')));
+    const g = new RoadGraph(JSON.parse(raw.toString('utf8')));
+    const brute = (x: number, n: number, ground: boolean) => {
+      let bd = Infinity;
+      for (let u = 0; u < g.nodeCount; u++) {
+        if (!g.outgoing(u).length || g.nearestNode(g.nodeXY(u)[0], g.nodeXY(u)[1], ground) !== u) continue;
+        const [ux, un] = g.nodeXY(u);
+        bd = Math.min(bd, (ux - x) ** 2 + (un - n) ** 2);
+      }
+      return bd;
+    };
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let k = 0; k < 5; k++) {
+      const x = (rnd() - 0.5) * 16000, n = (rnd() - 0.5) * 16000;
+      const u = g.nearestNode(x, n, true);
+      const [ux, un] = g.nodeXY(u);
+      expect((ux - x) ** 2 + (un - n) ** 2).toBeCloseTo(brute(x, n, true), 3);
+    }
+    const t0 = performance.now();
+    for (let k = 0; k < 1000; k++) g.nearestNode((rnd() - 0.5) * 8000, (rnd() - 0.5) * 8000, true);
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
+});

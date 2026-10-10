@@ -8,34 +8,69 @@ const ENGINE = 520; // N per driven wheel
 const BRAKE = 6;
 const WHEELS: [number, number][] = [[0.34, 0.62], [-0.34, 0.62], [0.34, -0.58], [-0.34, -0.58]]; // x, z (chassis)
 
-/** Procedural unbranded Activa-style scooter. Local +z is forward. */
+/** Procedural unbranded Activa-style scooter (rounded panels, apron, mirrors, plate). Local +z is forward. */
 function scooterMesh(color: number) {
   const root = new THREE.Group();
-  const body = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.2 });
+  const body = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.25 });
   const black = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.7 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0x3a3a3c, roughness: 0.6 });
   const chrome = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.25, metalness: 0.9 });
   const lamp = new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xfff2cc, emissiveIntensity: 0.0 });
+  const plate = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.5 });
   const lean = new THREE.Group();
   root.add(lean);
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, rx = 0) => {
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, rx = 0, parent: THREE.Object3D = lean) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.rotation.x = rx;
     m.castShadow = true;
-    lean.add(m);
+    parent.add(m);
     return m;
   };
-  add(new THREE.BoxGeometry(0.34, 0.08, 0.62), black, 0, 0.28, 0.05); // floorboard
-  add(new THREE.BoxGeometry(0.36, 0.42, 0.62), body, 0, 0.5, -0.42); // rear body
-  add(new THREE.BoxGeometry(0.30, 0.10, 0.62), black, 0, 0.76, -0.38); // seat
-  add(new THREE.BoxGeometry(0.34, 0.7, 0.14), body, 0, 0.55, 0.42, -0.25); // front apron
-  add(new THREE.BoxGeometry(0.08, 0.5, 0.08), black, 0, 0.98, 0.5, -0.35); // steering column
-  const handle = add(new THREE.BoxGeometry(0.62, 0.05, 0.05), chrome, 0, 1.18, 0.42);
-  const headlight = add(new THREE.BoxGeometry(0.16, 0.1, 0.06), lamp, 0, 1.08, 0.52);
-  add(new THREE.BoxGeometry(0.2, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: 0xaa1111, emissive: 0x440000 }), 0, 0.68, -0.74); // tail lamp
-  const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.1, 16).rotateZ(Math.PI / 2);
-  const front = add(wheelGeo, black, 0, 0.22, 0.6);
-  const rear = add(wheelGeo, black, 0, 0.22, -0.58);
+  // Rear body: a stretched sphere tapering to the tail, side panels slightly flared.
+  add(new THREE.SphereGeometry(0.25, 20, 14), body, 0, 0.5, -0.42).scale.set(0.8, 0.82, 1.65);
+  add(new THREE.BoxGeometry(0.3, 0.08, 0.6), black, 0, 0.28, 0.08); // floorboard
+  add(new THREE.BoxGeometry(0.32, 0.03, 0.56), grey, 0, 0.33, 0.08); // rubber mat
+  // Seat: a long rounded cushion.
+  add(new THREE.CapsuleGeometry(0.12, 0.5, 4, 12), black, 0, 0.77, -0.4, Math.PI / 2).scale.set(1.15, 1, 0.55);
+  add(new THREE.TorusGeometry(0.13, 0.015, 6, 14, Math.PI), chrome, 0, 0.74, -0.78, -Math.PI / 2); // grab rail
+  // Front apron: an extruded curved shield from floorboard to handlebar, plus the leg-shield.
+  const shield = new THREE.Shape();
+  shield.moveTo(-0.19, 0); shield.lineTo(0.19, 0); shield.quadraticCurveTo(0.21, 0.45, 0.13, 0.78);
+  shield.lineTo(-0.13, 0.78); shield.quadraticCurveTo(-0.21, 0.45, -0.19, 0);
+  const apron = new THREE.ExtrudeGeometry(shield, { depth: 0.08, bevelEnabled: true, bevelSize: 0.025, bevelThickness: 0.025, bevelSegments: 2, curveSegments: 8 });
+  add(apron, body, 0, 0.3, 0.36, 0.1);
+  add(new THREE.SphereGeometry(0.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), body, 0, 0.4, 0.6).scale.set(0.6, 0.55, 1.0); // front mudguard
+  // Handlebar with a cowl, headlight, grips and mirrors.
+  const bar = new THREE.Group();
+  bar.position.set(0, 1.12, 0.46);
+  lean.add(bar);
+  add(new THREE.SphereGeometry(0.13, 14, 10), body, 0, 0, 0, 0, bar).scale.set(1.3, 0.55, 0.75); // cowl
+  add(new THREE.BoxGeometry(0.66, 0.035, 0.035), chrome, 0, 0.02, -0.03, 0, bar);
+  for (const sx of [-1, 1]) {
+    add(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 8).rotateZ(Math.PI / 2), black, sx * 0.3, 0.02, -0.03, 0, bar); // grips
+    add(new THREE.CylinderGeometry(0.006, 0.006, 0.22, 4), chrome, sx * 0.2, 0.12, -0.02, 0, bar).rotation.z = sx * -0.25;
+    add(new THREE.SphereGeometry(0.04, 10, 6), black, sx * 0.23, 0.23, -0.02, 0, bar).scale.set(1.3, 0.8, 0.4); // mirrors
+  }
+  const headlight = add(new THREE.SphereGeometry(0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), lamp, 0, -0.02, 0.09, Math.PI / 2, bar);
+  headlight.scale.set(1.3, 1, 0.8);
+  add(new THREE.BoxGeometry(0.2, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: 0xaa1111, emissive: 0x440000 }), 0, 0.6, -0.82); // tail lamp
+  add(new THREE.BoxGeometry(0.2, 0.1, 0.01), plate, 0, 0.45, -0.84); // number plate
+  add(new THREE.CylinderGeometry(0.03, 0.035, 0.32, 8).rotateX(Math.PI / 2), chrome, 0.16, 0.24, -0.6); // silencer
+  const wheel = () => {
+    const g = new THREE.Group();
+    const tyre = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.055, 8, 20).rotateY(Math.PI / 2), black);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12).rotateZ(Math.PI / 2), grey);
+    tyre.castShadow = true;
+    g.add(tyre, rim);
+    return g;
+  };
+  const front = wheel();
+  front.position.set(0, 0.22, 0.6);
+  const rear = wheel();
+  rear.position.set(0, 0.22, -0.58);
+  lean.add(front, rear);
+  const handle = bar;
   return { root, lean, front, rear, handle, headlight, lampMat: lamp };
 }
 

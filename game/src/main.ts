@@ -62,13 +62,6 @@ async function main() {
       new Promise((r) => setTimeout(r, 3000)),
     ]);
   } catch { /* fonts unavailable: fall back to system fonts */ }
-  // Signboards are drawn with Noto Sans / Noto Sans Gujarati; wait briefly for them (system fonts otherwise).
-  try {
-    await Promise.race([
-      Promise.all([document.fonts.load('700 20px "Noto Sans"', 'A'), document.fonts.load('600 20px "Noto Sans Gujarati"', 'શ્રી')]),
-      new Promise((r) => setTimeout(r, 3000)),
-    ]);
-  } catch { /* fonts unavailable: fall back */ }
   const world = await World.load('world', physics, shadowSize > 0, quality.stream);
   scene.add(world.root);
 
@@ -172,6 +165,39 @@ async function main() {
       edgeNotice = 8;
     }
   }
+  /** Put the scooter on the nearest road beside the player, facing along it. */
+  function bringScooter() {
+    const p = player.position;
+    let x = p.x + 1.5, z = p.z;
+    if (graph) {
+      const [nx, nn] = graph.nodeXY(graph.nearestNode(p.x, -p.z, true));
+      if (Math.hypot(nx - p.x, -nn - p.z) < 40) { x = nx; z = -nn; }
+    }
+    const y = physics.groundAt(x, z, p.y + 3) ?? world.terrainAt(x, z) ?? p.y;
+    scooter.setFrozen(false);
+    scooter.teleport(x, y + 0.1, z);
+    hud.flash('Your scooter is here');
+  }
+
+  /**
+   * Safety net against falling through the ground (colliders still building, or a shove from traffic):
+   * nothing we control may sink below the terrain surface. Cheap: one height-grid lookup each.
+   */
+  function keepAboveGround() {
+    if (traveling) return;
+    const s = scooter.position;
+    const gs = world.terrainAt(s.x, s.z);
+    if (gs !== null && s.y < gs - 0.8) {
+      scooter.teleport(s.x, gs + 0.2, s.z);
+      if (!riding && s.distanceTo(player.position) > 150) scooter.setFrozen(true);
+    }
+    if (!riding) {
+      const p = player.position;
+      const gp = world.terrainAt(p.x, p.z);
+      if (gp !== null && p.y < gp - 0.8) player.teleport(p.x, gp + 0.1, p.z);
+    }
+  }
+
   let showPerf = false;
   let fixedView: { pos: THREE.Vector3; look: THREE.Vector3 } | null = null;
 
@@ -183,6 +209,7 @@ async function main() {
 
   let acc = 0;
   let simTime = 0;
+  let lifeMs = 0;
   const worst: Record<string, number> = { sim: 0, hud: 0, route: 0 };
   let tMark = 0;
   const mark = (name: string) => { const t = performance.now(); worst[name] = Math.max(worst[name] ?? 0, t - tMark); tMark = t; };
@@ -207,6 +234,7 @@ async function main() {
       if (riding) {
         riding = false;
         scooter.setRider(null);
+        player.character.pose = 'stand';
         const yaw = scooter.yaw();
         const p = scooter.position;
         const ox = Math.cos(yaw) * -1.0, oz = -Math.sin(yaw) * -1.0; // step off to the right side
@@ -220,13 +248,16 @@ async function main() {
         player.setVisible(false);
         player.object.visible = true;
         scooter.setRider(player.object);
+        player.character.pose = 'ride';
         follow.yaw = scooter.yaw() + Math.PI;
       }
     }
     if (controls && !riding && input.hit('Space')) player.requestJump();
-    if (input.hit('KeyH')) audio.horn();
+    if (controls && riding && input.hit('KeyH')) audio.horn(); // the horn belongs to the vehicle
+    // On foot, R brings your scooter to the roadside next to you (handy if you lost it).
+    if (controls && !riding && input.hit('KeyR') && scooter.position.distanceTo(player.position) > 8) bringScooter();
     if (input.hit('KeyT')) clock.hours = (clock.hours + 1) % 24;
-    if (input.hit('KeyR') && riding) scooter.resetUpright();
+    if (controls && input.hit('KeyR') && riding) scooter.resetUpright();
     if (input.hit('F3')) showPerf = !showPerf;
 
     mark('input');
@@ -244,12 +275,16 @@ async function main() {
     }
     worst.sim = Math.max(worst.sim, performance.now() - tSim);
     clock.advance(dt);
-    if (life) life.update(dt, here(), clock.hours);
+    const tLife = performance.now();
+    if (life) life.update(dt, here(), clock.hours, riding ? [scooter.position] : [player.position, scooter.position]);
+    lifeMs = lifeMs * 0.95 + (performance.now() - tLife) * 0.05;
+    keepAboveGround();
 
     mark('simAll');
     // --- Visuals ----------------------------------------------------------------
     const alpha = acc / STEP;
-    player.render(alpha, dt);
+    if (riding) player.ridePose(dt);
+    else player.render(alpha, dt);
     scooter.sync(dt, worldUniforms.uNight.value, alpha);
     const focus = riding ? scooter.focus : player.focus;
     if (fixedView) {
@@ -268,6 +303,9 @@ async function main() {
       const p = fixedView ? fixedView.pos : travelTo ?? (riding ? scooter.position : player.position);
       // The parked scooter keeps the ground under it; if that isn't loaded it is frozen in place.
       const anchors = riding ? [] : [scooter.position];
+      const fwd = camera.getWorldDirection(new THREE.Vector3());
+      const fl = Math.hypot(fwd.x, fwd.z) || 1;
+      world.viewDir = { x: fwd.x / fl, z: fwd.z / fl };
       world.update(p.x, p.z, v.x, v.z, fixedView ? 50 : 4, anchors);
       if (!riding) scooter.setFrozen(!world.readyAt(scooter.position.x, scooter.position.z));
       guard(dt);
@@ -319,6 +357,26 @@ async function main() {
     route: (x0: number, n0: number, x1: number, n1: number) => graph?.route(x0, n0, x1, n1)?.points ?? null,
     worldStats: () => world.stats(),
     life: () => life?.stats() ?? null,
+    lifeMs: () => lifeMs,
+    // Triangles by material for visible meshes inside the camera frustum, and those casting shadows.
+    triBreakdown: () => {
+      const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      const out: Record<string, number> = {};
+      scene.traverseVisible((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh || !m.geometry) return;
+        const g = m.geometry;
+        const inst = (m as unknown as THREE.InstancedMesh).isInstancedMesh ? (m as unknown as THREE.InstancedMesh).count : 1;
+        const tris = ((g.index ? g.index.count : g.attributes.position.count) / 3) * inst;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        const inView = !m.frustumCulled || fr.intersectsSphere(g.boundingSphere!.clone().applyMatrix4(m.matrixWorld));
+        const key = (m.material as THREE.Material).name || (m.material as THREE.Material).type;
+        const k2 = key + (inst > 1 ? '[inst]' : '');
+        if (inView) out[k2 + ' view'] = (out[k2 + ' view'] ?? 0) + tris;
+        if (m.castShadow) out[k2 + ' cast'] = (out[k2 + ' cast'] ?? 0) + tris;
+      });
+      return out;
+    },
     agents: () => (life?.agents ?? []).map((a) => ({ kind: a.kind, x: a.x, n: a.n, y: a.y, yaw: a.yaw, v: a.v })),
     debugScene: () => { const out: Record<string, number> = {}; scene.traverse((o) => { const mm = o as THREE.Mesh; if (mm.isMesh) { const k = (mm.material as THREE.Material).type + ((mm.material as THREE.MeshStandardMaterial).map ? ":map" : "") + (mm.visible ? "" : ":hidden") + ((mm.material as THREE.MeshStandardMaterial).map ? "@" + mm.parent?.name : ""); out[k] = (out[k] ?? 0) + 1; } }); return out; },
     roadNear: (x: number, n: number) => (graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n]),

@@ -1,0 +1,35 @@
+import { chromium } from '@playwright/test';
+// Close-ups of the player: standing, walking, riding. Usage: node tools/probe-character.mjs
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 800, height: 600 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+await p.goto('http://localhost:5173/?shadows=0&fixedstep=1&dynres=0&date=2026-10-09&hour=11&quality=low');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 120000 });
+const waitSim = (d) => p.evaluate((d) => new Promise((r) => { const t0 = window.__game.simTime(); const f = () => window.__game.simTime() - t0 >= d ? r() : requestAnimationFrame(f); f(); }), d);
+await waitSim(1);
+const look = async (name, dx, dy, dz, hy = 1.0) => {
+  const pp = await p.evaluate(() => window.__game.player());
+  await p.evaluate(([x, y, z, dx, dy, dz, hy]) => window.__game.setView([x + dx, y + dy, z + dz], [x, y + hy, z]), [...pp, dx, dy, dz, hy]);
+  await waitSim(0.3);
+  await p.screenshot({ path: `../shots/${name}.png` });
+  await p.evaluate(() => window.__game.freeView());
+};
+await look('60-char-front', 0.6, 1.4, 2.2, 1.2);
+await look('61-char-face', 0.15, 1.6, 0.8, 1.55);
+await p.locator('#game').click();
+await p.keyboard.down('KeyW');
+await waitSim(1.2);
+await look('62-char-run', 2.6, 1.2, 0.4);
+await p.keyboard.up('KeyW');
+const s0 = await p.evaluate(() => window.__game.scooter());
+await p.evaluate(([x, y, z]) => window.__game.teleportPlayer(x - 1.2, y - 0.5, z), s0.pos);
+await waitSim(0.5);
+await p.keyboard.press('KeyE');
+await waitSim(0.5);
+const s1 = await p.evaluate(() => window.__game.scooter());
+console.log('riding', s1.riding);
+await p.evaluate(([x, y, z]) => window.__game.setView([x + 2.4, y + 0.9, z + 0.6], [x, y + 0.5, z]), s1.pos);
+await waitSim(0.3);
+await p.screenshot({ path: '../shots/63-char-ride.png' });
+console.log('horn test: H while riding only (see main.ts)');
+await b.close();

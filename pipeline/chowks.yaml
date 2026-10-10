@@ -17,4 +17,8 @@ chowks:
     n: 164
     kind: tree              # "Limda" = neem: the landmark is the old neem tree
   # Jubilee Chowk (Mahatma Gandhi) and the Swami Vivekananda statue are already placed from map data.
-  # Bahumali Bhavan Circle (Sardar Patel statue): position not found in OSM/Overture yet.
+  - name: Bahumali Bhavan Circle
+    x: -855
+    n: 1062
+    kind: statue
+    subject: patel          # Sardar Vallabhbhai Patel; position from Rakshit's map pin (2026-10-10)

@@ -3,7 +3,7 @@
 Output world/map.json.gz:
   nodes:  flat [x, n, ...] in whole metres from the origin
   edges:  parallel arrays a, b, rank, flags (bit0 one-way a->b, bit1 bridge), name (strings index or -1),
-          length (dm), and polyline points (offsets into `pts`, flat [x, n, ...] metres, simplified 2 m)
+          length (dm), carriageway width (dm), and polyline points (offsets into `pts`, flat [x, n, ...] metres, simplified 2 m)
   labels: [{t, x, n, kind}] neighbourhoods and landmarks
 The road graph doubles as the map layer, so the map draws exactly what GPS routes on.
 """
@@ -55,10 +55,10 @@ def run(cfg: C.Config) -> None:
             nodes.extend(p)
         return node_id[p]
 
-    ea, eb, erank, eflags, ename, elen, estart = [], [], [], [], [], [], []
+    ea, eb, erank, eflags, ename, elen, estart, ewidth = [], [], [], [], [], [], [], []
     pts: list[int] = []
-    for c, rank, oneway, bridge, name in zip(lines, roads["rank"].values, roads.oneway.values,
-                                             roads.bridge.values, roads.name.values):
+    for c, rank, oneway, bridge, name, width in zip(lines, roads["rank"].values, roads.oneway.values,
+                                                    roads.bridge.values, roads.name.values, roads.width.values):
         cut = [k for k, p in enumerate(map(tuple, c)) if k in (0, len(c) - 1) or use[p] > 1]
         for s, e in zip(cut[:-1], cut[1:]):
             seg = c[s:e + 1]
@@ -72,6 +72,7 @@ def run(cfg: C.Config) -> None:
             eflags.append(int(bool(oneway)) | int(bool(bridge)) << 1)
             ename.append(name_id(name))
             elen.append(int(round(length * 10)))
+            ewidth.append(int(round(float(width) * 10)))
             estart.append(len(pts) // 2)
             pts.extend(np.round(simp).astype(int).ravel().tolist())
     estart.append(len(pts) // 2)
@@ -102,7 +103,8 @@ def run(cfg: C.Config) -> None:
     data = {
         "version": 1,
         "nodes": [round(v) for v in nodes],
-        "edges": {"a": ea, "b": eb, "rank": erank, "flags": eflags, "name": ename, "len": elen, "start": estart},
+        "edges": {"a": ea, "b": eb, "rank": erank, "flags": eflags, "name": ename, "len": elen, "start": estart,
+                  "width": ewidth},
         "pts": pts,
         "labels": labels,
         "bounds": [round(v) for v in np.asarray(bounds["playable"].bounds) - (ox, oy, ox, oy)],

@@ -1,7 +1,7 @@
 # Raw and intermediate data (large, re-downloadable)
-data/
+/data/
 # Generated world package
-world/
+/world/
 # Private, per-machine config (e.g. owner's home location) — never commit
 pipeline/local.yaml
 

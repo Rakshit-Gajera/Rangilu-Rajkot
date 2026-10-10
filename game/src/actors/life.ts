@@ -31,6 +31,7 @@ interface Agent {
   honk: number;
   body?: RAPIER.RigidBody;
   wait: number; // cows: seconds until they move; peds: pause
+  check: number; // seconds until the next "am I inside a building?" test
 }
 
 interface Spec { model: ModelName; weight: number; length: number; speed: number; lane: number }
@@ -72,6 +73,7 @@ export class Life {
   readonly agents: Agent[] = [];
   private meshes: THREE.InstancedMesh[];
   private rnd = 1234567;
+  private counts: Record<Kind, number> = { vehicle: 0, ped: 0, cow: 0 };
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private up = new THREE.Vector3(0, 1, 0);
@@ -110,15 +112,13 @@ export class Life {
   }
 
   private count(kind: Kind) {
-    let c = 0;
-    for (const a of this.agents) if (a.kind === kind) c++;
-    return c;
+    return this.counts[kind];
   }
 
   /** Pick a random routable edge with a point 120–550 m from (x, n). */
   private spawnPoint(x: number, n: number, minRank: number): { edge: number; fwd: boolean; s: number } | null {
     const e = this.graph.data.edges;
-    for (let tries = 0; tries < 12; tries++) {
+    for (let tries = 0; tries < 4; tries++) {
       const ang = this.rand() * Math.PI * 2, d = SPAWN_MIN + this.rand() * (SPAWN_MAX - SPAWN_MIN);
       const u = this.graph.nearestNode(x + Math.cos(ang) * d, n + Math.sin(ang) * d, true);
       const out = this.graph.outgoing(u).filter(([k]) => e.rank[k] >= minRank && !(e.flags[k] & 2));
@@ -130,8 +130,7 @@ export class Life {
   }
 
   private roadHalfWidth(edge: number) {
-    const r = this.graph.data.edges.rank[edge];
-    return r >= 7 ? 6 : r >= 6 ? 4.5 : r >= 5 ? 3.5 : r >= 3 ? 2.6 : 2;
+    return this.graph.width(edge) / 2;
   }
 
   private spawn(kind: Kind, px: number, pn: number) {
@@ -154,15 +153,19 @@ export class Life {
       lane = lanePos;
     } else if (kind === 'ped') {
       model = MODELS.indexOf(PEDS[Math.floor(this.rand() * PEDS.length)]);
-      lane = (this.rand() < 0.5 ? 1 : -1) * (half + 1.5 + this.rand());
+      // Main roads have footpaths (furniture.ts: 2.2 m from the kerb); elsewhere people walk at the road's edge.
+      const rank = this.graph.data.edges.rank[sp.edge];
+      const off = rank >= 6 ? half + 0.6 + this.rand() * 1.2 : Math.max(0.6, half - 0.3 - this.rand() * 0.5);
+      lane = (this.rand() < 0.5 ? 1 : -1) * off;
       v0 = 1.1 + this.rand() * 0.5;
     } else {
       model = MODELS.indexOf(this.rand() < 0.6 ? 'cow-sit' : 'cow-stand');
-      lane = (this.rand() < 0.5 ? 1 : -1) * (half - 0.3 + this.rand() * 1.5);
+      lane = (this.rand() < 0.5 ? 1 : -1) * Math.max(0.8, half - 0.6 + this.rand() * 0.6);
       v0 = 0.4;
     }
     this.agents.push({ kind, model, edge: sp.edge, fwd: sp.fwd, s: sp.s, v: kind === 'vehicle' ? v0 * 0.6 : v0, v0, lane,
-      length, x: 0, n: 0, y: 0, yaw: 0, honk: 0, wait: this.rand() * 20 });
+      length, x: 0, n: 0, y: 0, yaw: 0, honk: 0, wait: this.rand() * 20, check: 0 });
+    this.counts[kind]++;
   }
 
   /** Next edge at the end node: never a U-turn unless it's a dead end; bigger roads preferred. */
@@ -180,13 +183,35 @@ export class Life {
     return true;
   }
 
-  update(dt: number, player: THREE.Vector3, hour: number) {
+  /** Sandbox sliders (PROMPT §3.5): 0..2 multipliers on the preset caps. */
+  trafficScale = 1;
+  pedScale = 1;
+
+  /**
+   * player: where the player is (spawning and despawning centre).
+   * obstacles: things traffic must stop for besides cows, e.g. the player and a parked scooter (three.js coords).
+   */
+  update(dt: number, player: THREE.Vector3, hour: number, obstacles: THREE.Vector3[] = [player]) {
     const px = player.x, pn = -player.z;
     const density = trafficDensity(hour);
-    // Spawn a few per frame up to the caps (scaled by time of day).
-    if (this.count('vehicle') < this.maxVehicles * density) this.spawn('vehicle', px, pn);
-    if (this.count('ped') < this.maxPeds * (0.3 + 0.7 * density)) this.spawn('ped', px, pn);
-    if (this.count('cow') < this.maxCows) this.spawn('cow', px, pn);
+    // Spawn up to two agents per frame, each time for the kind furthest below its target.
+    const target: Record<Kind, number> = {
+      vehicle: this.maxVehicles * density * this.trafficScale,
+      ped: this.maxPeds * (0.3 + 0.7 * density) * this.pedScale,
+      cow: this.maxCows,
+    };
+    for (let k = 0; k < 2; k++) {
+      let pick: Kind | null = null, worst = 1;
+      for (const kind of ['vehicle', 'ped', 'cow'] as Kind[]) {
+        const fill = target[kind] > 0 ? this.counts[kind] / target[kind] : 1;
+        if (fill < worst) { worst = fill; pick = kind; }
+      }
+      if (pick) this.spawn(pick, px, pn);
+    }
+    // Over the cap (slider lowered, evening ends): let the farthest ones go.
+    this.trim('vehicle', Math.ceil(target.vehicle * 1.1), px, pn);
+    this.trim('ped', Math.ceil(target.ped * 1.1), px, pn);
+    const blockers = obstacles.map((o) => ({ x: o.x, n: -o.z }));
 
     // Leaders: sort vehicles on each directed edge by position.
     const lanes = new Map<string, Agent[]>();
@@ -213,7 +238,7 @@ export class Life {
         }
         // Player and cows in our path: treat as stopped obstacles.
         const hx = Math.sin(a.yaw), hn = Math.cos(a.yaw);
-        for (const o of [{ x: px, n: pn }, ...cows]) {
+        for (const o of [...blockers, ...cows]) {
           const rx = o.x - a.x, rn = o.n - a.n;
           const ahead = rx * hx + rn * hn, side = Math.abs(rx * hn - rn * hx);
           if (ahead > 0 && ahead < 25 && side < 1.6) {
@@ -252,9 +277,43 @@ export class Life {
       if (ground === null || Math.hypot(a.x - px, a.n - pn) > DESPAWN) { this.remove(k); continue; }
       a.y = ground + (a.kind === 'ped' ? 0.15 : 0.02);
       a.yaw = Math.atan2(p.dx, p.dn);
+      if (this.insideBuilding(a, px, pn, dt)) {
+        // Mapped roads and building outlines don't always agree: people step back onto the road,
+        // vehicles and cows standing in a wall are removed (they respawn elsewhere).
+        if (a.kind === 'ped' && Math.abs(a.lane) > 0.8) { a.lane *= 0.6; a.check = 0; } else { this.remove(k); continue; }
+      }
       this.syncBody(a, px, pn);
     }
     this.render();
+  }
+
+  /** Remove the farthest agents of a kind above `cap`. */
+  private trim(kind: Kind, cap: number, px: number, pn: number) {
+    let over = this.counts[kind] - cap;
+    while (over-- > 0) {
+      let far = -1, fd = -1;
+      for (let k = 0; k < this.agents.length; k++) {
+        const a = this.agents[k];
+        if (a.kind !== kind) continue;
+        const d = Math.hypot(a.x - px, a.n - pn);
+        if (d > fd) { fd = d; far = k; }
+      }
+      if (far < 0 || fd < SPAWN_MIN) return; // never pop out of thin air in front of the player
+      this.remove(far);
+    }
+  }
+
+  /**
+   * True if a building (or other world solid) stands over the agent: a ray down from 25 m above
+   * hits something well above the ground. Only near the player, where colliders exist; ~1 test per second each.
+   */
+  private insideBuilding(a: Agent, px: number, pn: number, dt: number): boolean {
+    a.check -= dt;
+    if (a.check > 0) return false;
+    a.check = 0.8 + this.rand() * 0.4;
+    if (Math.hypot(a.x - px, a.n - pn) > 250) return false;
+    const top = this.physics.groundAt(a.x, -a.n, a.y + 25);
+    return top !== null && top > a.y + 2.2;
   }
 
   /** Kinematic colliders only for agents near the player (PROMPT §9.4). */
@@ -280,6 +339,7 @@ export class Life {
   private remove(k: number) {
     const a = this.agents[k];
     if (a.body) this.physics.world.removeRigidBody(a.body);
+    this.counts[a.kind]--;
     this.agents.splice(k, 1);
   }
 
