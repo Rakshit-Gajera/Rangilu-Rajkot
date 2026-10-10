@@ -82,6 +82,7 @@ const waitSim = (page: Page, secs: number) => page.evaluate((d) => new Promise<v
 }), secs);
 
 test('walks and rides the scooter without falling through the world', async ({ page }) => {
+  test.setTimeout(420_000); // fixed-step simulation in a software renderer is slow
   await page.goto('/?fixedstep=1&shadows=0&date=2026-10-09');
   await page.waitForFunction(() => (window as any).__game?.ready, null, { timeout: 120_000 });
   const start = await page.evaluate(() => (window as any).__game.player());

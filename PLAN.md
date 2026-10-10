@@ -11,9 +11,21 @@ Current phase: **P6 — Polish and ship** (PROMPT.md §13). Gate: v1.0 release.
       lower max pixel ratio, slightly smaller full-detail radius
 - [x] 6.5 Settings (volume, mouse sensitivity, invert Y, FOV, key hints), credits screen from CREDITS.md
 - [x] 6.6 Onboarding (welcome card + timed tips) and touch controls (stick, look, buttons)
-- [ ] 6.7 Language: English / ગુજરાતી for the UI
-- [ ] 6.8 Accessibility pass (UI scale, reduced motion, colour-safe markers)
-- [ ] 6.9 Bug bash + README + published link (needs Rakshit's OK to publish)
+- [x] 6.7 Title screen (drone shot over Race Course, character setup) with English / ગુજરાતી (title, HUD hints, key prompts)
+- [x] 6.8 Accessibility: UI size, reduce motion, remappable keys, gamepad
+- [x] 6.9 README, DEPLOY.md, Cloudflare-ready build (world data committed, headers, robust .gz loading)
+- [x] 6.10 All 8 activities (+ kite fight, gully cricket, lokmelo), 20 landmark models, lakes visible with ripples,
+      street dogs, petting animals
+- [ ] 6.11 Rakshit: connect Cloudflare Pages (DEPLOY.md) → public link
+- [ ] 6.12 Release gate: Rakshit plays on his laptop (F3 numbers on High/Ultra), bug list → fixes → v1.0 tag
+
+## Remaining after v1 (not blocking the release)
+- Gujarati for every menu (only title, HUD hints and prompts are translated so far)
+- Swimming, climbing low walls, crouching; benches and food stalls you can use with E; pillion rider; radio
+- Pigeons at chabutaras; more landmark detail from Rakshit's photos; Connaught Hall, Ramvan, market streets as landmarks
+- Dam walls for Aji-1 / Nyari-1; roof variety (Mangalore tiles, solar panels, dish antennas); road medians
+- Bicycle stamina; vehicle cosmetic damage; IndexedDB tile cache for offline play
+- Signals at more junctions (only main-road crossings now)
 
 Previous: **P5 — Sandbox and activities**. Gate: fun check by Rakshit.
 
