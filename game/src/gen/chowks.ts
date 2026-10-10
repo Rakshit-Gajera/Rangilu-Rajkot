@@ -108,7 +108,7 @@ function emit(c: Chowk, solid: Builder, deco: Builder, lamps: Builder) {
           const t = s / len;
           const px = x0 + (x1 - x0) * t, pn = n0 + (n1 - n0) * t;
           const ix = cx + (px - cx) * (1 - 0.9 / radius), iz = -(c.n + (pn - c.n) * (1 - 0.9 / radius));
-          box(deco, ix, top - 0.02, iz, 0.45, 0.28, 0.45, MARIGOLD[Math.floor(r() * MARIGOLD.length)], r());
+          sphere(deco, [ix, top + 0.1, iz], 0.22, MARIGOLD[Math.floor(r() * MARIGOLD.length)], 0.8, 6);
         }
       }
     }
@@ -162,7 +162,7 @@ function plinth(b: Builder, cx: number, y: number, cz: number, w: number, h: num
 /** Procedural statue of the subject on a plinth, facing `yaw`. */
 function statue(solid: Builder, cx: number, y: number, cz: number, yaw: number, subject: number) {
   const big = subject === S_HANUMAN;
-  const H = big ? 6.4 : 2.6; // the Hanumanji statue is 21 feet
+  const H = big ? 6.4 : 3.2; // the Hanumanji statue is 21 feet; others a little over life size, as at chowks
   const top = plinth(solid, cx, y, cz, big ? 3.2 : 1.8, big ? 1.4 : 2.4, yaw);
   const f: V3 = [Math.sin(yaw), 0, -Math.cos(yaw)]; // forward
   const rt: V3 = [Math.cos(yaw), 0, Math.sin(yaw)]; // right

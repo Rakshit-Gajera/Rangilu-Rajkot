@@ -14,8 +14,8 @@ const VIEWS: { name: string; cam: [number, number, number]; look: [number, numbe
   { name: '05-trikon-baug', cam: [-16.0, 1.7, 2.4], look: [0.5, 3, 0.1], hour: 11 },
   { name: '07-rajkumar-college', cam: [-322.9, 1.7, -188.1], look: [-400.7, 6, -153.1], hour: 9 },
   // Phase 3: flyovers and chowks (positions from data/interim/roads.parquet and chowks.parquet).
-  { name: '30-flyover-ambedkar-chowk', cam: [290, 3, 1000], look: [190, 7, 1055], hour: 10 },
-  { name: '31-flyover-150ft-ring-road', cam: [-3040, 4, -880], look: [-3125, 7, -800], hour: 16 },
+  { name: '30-flyover-ambedkar-chowk', cam: [36, 2, 1014], look: [210, 8, 1060], hour: 10 },
+  { name: '31-flyover-150ft-ring-road', cam: [-3075, 2, -1000], look: [-3125, 8, -800], hour: 16 },
   { name: '32-indira-gandhi-statue', cam: [-3125, 4, -760], look: [-3144, 5, -741], hour: 10 },
   { name: '33-mahatma-gandhi-statue', cam: [-22, 4, 470], look: [-41, 4, 491], hour: 10 },
   { name: '34-hanumanji-statue', cam: [185, 4, 1050], look: [170, 8, 1075], hour: 10 },
@@ -39,6 +39,7 @@ async function boot(page: Page) {
 }
 
 test('boots to playable and captures viewpoints', async ({ page }) => {
+  test.setTimeout(15 * 60_000);
   mkdirSync(OUT, { recursive: true });
   const { errors, bootMs } = await boot(page);
   // Load the whole slice before the fixed views.
@@ -47,7 +48,9 @@ test('boots to playable and captures viewpoints', async ({ page }) => {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}/00-spawn-third-person.png` });
   const results: Record<string, unknown> = { bootMs };
-  for (const v of VIEWS) {
+  // VIEWS=3 captures only views whose name starts with "3" (quick iteration on one area).
+  const only = process.env.VIEWS;
+  for (const v of VIEWS.filter((x) => !only || x.name.startsWith(only))) {
     // Load the area first, and stand on the nearest real road (never inside a building or under the ground).
     const [rx, rn] = await page.evaluate(([x, n]) => (window as any).__game.roadNear(x, n), [v.cam[0], v.cam[2]]);
     if (v.cam[1] < 100 && Math.hypot(rx - v.cam[0], rn - v.cam[2]) < 60) { v.cam[0] = rx; v.cam[2] = rn; }

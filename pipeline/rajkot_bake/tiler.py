@@ -168,6 +168,8 @@ def run(cfg: C.Config) -> None:
     lm = gpd.read_parquet(C.interim("landmarks.parquet")).dropna(subset=["geometry"])
     lm_pts = [g if g.geom_type == "Point" else g.representative_point() for g in lm.geometry.values]
     chowks = gpd.read_parquet(C.interim("chowks.parquet"))
+    island_geoms = chowks.geometry.values[chowks.island.values]
+    island_tree = STRtree(island_geoms)
     chowk_cent = [g.centroid for g in chowks.geometry.values]
 
     packs: dict[tuple[int, int], list[tuple[int, int, bytes]]] = defaultdict(list)
@@ -229,6 +231,10 @@ def run(cfg: C.Config) -> None:
             if not sel:
                 continue
             u = shapely.union_all(sel).buffer(4, quad_segs=4).buffer(-4, quad_segs=4)
+            # Roads mapped straight through a circle must not cover its island.
+            isl = island_geoms[island_tree.query(tbox.buffer(30), predicate="intersects")]
+            if len(isl):
+                u = u.difference(shapely.union_all(isl))
             u = u.difference(taken)
             taken = taken.union(u)
             u = u.intersection(tbox)

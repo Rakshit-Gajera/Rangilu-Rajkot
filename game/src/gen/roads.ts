@@ -82,6 +82,34 @@ function ribbon(b: Builder, p: Float32Array, offset: number, half: number, lift:
   }
 }
 
+function inRing(ring: Float32Array, x: number, n: number): boolean {
+  let inside = false;
+  const m = ring.length / 2;
+  for (let i = 0, j = m - 1; i < m; j = i++) {
+    const xi = ring[2 * i], ni = ring[2 * i + 1], xj = ring[2 * j], nj = ring[2 * j + 1];
+    if ((ni > n) !== (nj > n) && x < ((xj - xi) * (n - ni)) / (nj - ni) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Split a road polyline (x, n, y triples) into the runs that lie outside chowk islands. */
+function outsideIslands(tile: Tile, p: Float32Array): Float32Array[] {
+  const islands = tile.chowks.filter((c) => c.island).map((c) => c.ring);
+  if (!islands.length) return [p];
+  const runs: Float32Array[] = [];
+  let start = -1;
+  const n = p.length / 3;
+  for (let k = 0; k <= n; k++) {
+    const out = k < n && !islands.some((r) => inRing(r, p[3 * k], p[3 * k + 1]));
+    if (out && start < 0) start = k;
+    if (!out && start >= 0) {
+      if (k - start >= 2) runs.push(p.slice(3 * start, 3 * k));
+      start = -1;
+    }
+  }
+  return runs;
+}
+
 function markings(tile: Tile): GeoBuf {
   const b = new Builder(false, { color: 3 });
   const white = [0.92, 0.92, 0.88];
@@ -89,12 +117,13 @@ function markings(tile: Tile): GeoBuf {
   for (const r of tile.roads) {
     if (r.tunnel || r.rank < 5) continue;
     const lift = r.bridge ? 0.02 : MARK_LIFT - ROAD_LIFT;
-    const p = r.bridge ? r.points : liftToGround(tile, r);
-    if (!r.oneway) ribbon(b, p, 0, 0.08, lift + ROAD_LIFT, r.rank >= 7 ? null : [3, 5], r.rank >= 7 ? yellow : white);
-    if (r.rank >= 6 && r.width >= 9) {
-      const edge = r.width / 2 - 0.5;
-      ribbon(b, p, edge, 0.075, lift + ROAD_LIFT, null, white);
-      ribbon(b, p, -edge, 0.075, lift + ROAD_LIFT, null, white);
+    for (const p of outsideIslands(tile, r.bridge ? r.points : liftToGround(tile, r))) {
+      if (!r.oneway) ribbon(b, p, 0, 0.08, lift + ROAD_LIFT, r.rank >= 7 ? null : [3, 5], r.rank >= 7 ? yellow : white);
+      if (r.rank >= 6 && r.width >= 9) {
+        const edge = r.width / 2 - 0.5;
+        ribbon(b, p, edge, 0.075, lift + ROAD_LIFT, null, white);
+        ribbon(b, p, -edge, 0.075, lift + ROAD_LIFT, null, white);
+      }
     }
   }
   return b.build();
@@ -110,7 +139,7 @@ function liftToGround(tile: Tile, r: RoadLine): Float32Array {
 function bridges(tile: Tile): { mesh: GeoBuf; collider: { position: Float32Array; index: Uint32Array } } {
   const b = new Builder(false, { color: 3 });
   const col = new Builder(false);
-  const concrete = [0.62, 0.6, 0.56];
+  const concrete = [0.72, 0.71, 0.68];
   const deckTop = [0.25, 0.25, 0.26];
   for (const r of tile.roads) {
     if (!r.bridge) continue;
