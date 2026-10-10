@@ -1,7 +1,7 @@
 import earcut from 'earcut';
 import { rng } from '../core/rng';
 import {
-  CHOWK_FLAG, CHOWK_FOUNTAIN, CHOWK_GARDEN, CHOWK_SCULPTURE, CHOWK_STATUE, type Chowk, type Tile,
+  CHOWK_AIRCRAFT, CHOWK_FLAG, CHOWK_FOUNTAIN, CHOWK_TREE, CHOWK_GARDEN, CHOWK_SCULPTURE, CHOWK_STATUE, type Chowk, type Tile,
 } from '../world/rtile';
 import { Builder, type GeoBuf } from './geobuf';
 import { box, cylinder, segment, sphere, type V3 } from './prims';
@@ -130,6 +130,8 @@ function emit(c: Chowk, solid: Builder, deco: Builder, lamps: Builder) {
     case CHOWK_FOUNTAIN: fountain(solid, deco, cx, g, cz, Math.min(radius * 0.45, 6.5)); break;
     case CHOWK_SCULPTURE: sculpture(solid, cx, g, cz, Math.min(radius * 0.35, 4), r); break;
     case CHOWK_FLAG: flag(solid, deco, cx, g, cz, yaw); break;
+    case CHOWK_AIRCRAFT: aircraft(solid, cx, g, cz, yaw); break;
+    case CHOWK_TREE: bigNeem(solid, deco, cx, g, cz, r); break;
     case CHOWK_GARDEN:
     default:
       if (radius > 3) {
@@ -284,4 +286,46 @@ function flag(solid: Builder, deco: Builder, cx: number, y: number, cz: number, 
   segment(deco, [cx + f[0] * (w / 2 + 0.08), fy - 0.9, cz + f[2] * (w / 2 + 0.08)],
     [cx + f[0] * (w / 2 + 0.08) + Math.sin(yaw) * 0.03, fy - 0.9, cz + f[2] * (w / 2 + 0.08) - Math.cos(yaw) * 0.03],
     0.25, 0.25, NAVY, 12);
+}
+
+/** Grounded MIG-27 on a display pylon, nose raised (Kotecha Chowk). Simplified, about 17 m long. */
+function aircraft(solid: Builder, cx: number, y: number, cz: number, yaw: number) {
+  const GREY = [0.52, 0.56, 0.52], DARK = [0.2, 0.22, 0.22], GLASS = [0.25, 0.35, 0.42];
+  box(solid, cx, y, cz, 3.0, 0.4, 3.0, MARBLE_DARK, yaw);
+  segment(solid, [cx, y + 0.4, cz], [cx, y + 3.2, cz], 0.35, 0.3, DARK, 8);
+  const f: V3 = [Math.sin(yaw), 0, -Math.cos(yaw)];
+  const rt: V3 = [Math.cos(yaw), 0, Math.sin(yaw)];
+  const pitch = 0.18; // nose up
+  const P = (along: number, lat: number, up: number): V3 => {
+    const a = along * Math.cos(pitch) - up * Math.sin(pitch), u = along * Math.sin(pitch) + up * Math.cos(pitch);
+    return [cx + f[0] * a + rt[0] * lat, y + 3.6 + u, cz + f[2] * a + rt[2] * lat];
+  };
+  segment(solid, P(-8, 0, 0), P(6, 0, 0), 0.75, 0.85, GREY, 10);   // fuselage
+  segment(solid, P(6, 0, 0), P(9, 0, 0), 0.85, 0.08, GREY, 10);    // nose cone
+  segment(solid, P(-8.6, 0, 0), P(-8, 0, 0), 0.55, 0.7, DARK, 10); // exhaust
+  sphere(solid, P(4.2, 0, 0.75), 0.55, GLASS, 0.6, 8);             // canopy
+  // Swept wings and tailplanes as thin boxes along the span.
+  for (const side of [1, -1]) {
+    segment(solid, P(0.5, side * 0.6, 0), P(-2.5, side * 6.8, -0.1), 0.18, 0.06, GREY, 4);
+    segment(solid, P(-1.5, side * 0.6, 0), P(-3.5, side * 6.4, -0.1), 0.18, 0.06, GREY, 4);
+    segment(solid, P(-6.4, side * 0.5, -0.2), P(-7.8, side * 3.0, -0.3), 0.12, 0.05, GREY, 4);
+    segment(solid, P(2.5, side * 0.9, -0.4), P(0, side * 1.0, -0.4), 0.38, 0.38, DARK, 6); // intakes
+  }
+  segment(solid, P(-5.5, 0, 0.6), P(-7.8, 0, 3.4), 0.25, 0.08, GREY, 4); // tail fin
+}
+
+/** The old neem of Limda Chowk on a raised stone platform (chabutro). */
+function bigNeem(solid: Builder, deco: Builder, cx: number, y: number, cz: number, r: () => number) {
+  cylinder(solid, cx, y, cz, 3.2, 0.6, MARBLE_DARK, 16);
+  segment(solid, [cx, y + 0.6, cz], [cx + 0.3, y + 5.5, cz], 0.8, 0.55, [0.32, 0.25, 0.18], 10);
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + r();
+    segment(solid, [cx + 0.2, y + 5, cz], [cx + Math.cos(a) * 3.5, y + 7.5, cz + Math.sin(a) * 3.5], 0.35, 0.15, [0.32, 0.25, 0.18], 6);
+  }
+  const g = [0.2, 0.36, 0.13];
+  sphere(deco, [cx, y + 10, cz], 5.5, g, 0.6, 10);
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * Math.PI * 2;
+    sphere(deco, [cx + Math.cos(a) * 5, y + 8.6 + r(), cz + Math.sin(a) * 5], 3.6, g, 0.65, 8);
+  }
 }

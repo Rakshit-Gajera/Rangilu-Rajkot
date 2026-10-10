@@ -18,6 +18,7 @@ import re
 import duckdb
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import shapely
 import yaml
 from shapely.geometry import Point
@@ -25,7 +26,7 @@ from shapely.geometry import Point
 from . import config as C
 from . import geom
 
-KINDS = {"garden": 0, "fountain": 1, "statue": 2, "sculpture": 3, "flag": 4}
+KINDS = {"garden": 0, "fountain": 1, "statue": 2, "sculpture": 3, "flag": 4, "aircraft": 5, "tree": 6}
 SUBJECTS = {"none": 0, "gandhi": 1, "indira": 2, "vivekananda": 3, "hanuman": 4, "patel": 5, "ambedkar": 6, "figure": 7}
 SUBJECT_RE = [("indira", r"indira"), ("gandhi", r"mahatma|gandhi"), ("vivekananda", r"vivekanand"),
               ("hanuman", r"hanuman|bajrang"), ("patel", r"sardar|patel"), ("ambedkar", r"ambedkar")]
@@ -120,9 +121,22 @@ def run(cfg: C.Config) -> None:
     # Owner corrections (pipeline/chowks.yaml): match by name or by position.
     path = C.PIPELINE_DIR / "chowks.yaml"
     if path.exists():
+        meta = C.read_json(C.interim("bounds.json"))
+        ox, oy = meta["origin"]["easting"], meta["origin"]["northing"]
         for fix in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("chowks", []):
-            sel = g.name == fix["match"] if "match" in fix else g.distance(Point(fix["x"], fix["y"])) < 30
-            for key in ("name", "kind", "subject"):
+            pt = Point(ox + fix["x"], oy + fix["n"])
+            d = g.distance(pt)
+            if len(d) and d.min() < 80:  # place points are often at a corner of the circle
+                sel = d == d.min()
+            else:
+                # No island there in OSM: add one (on a road) or a plinth (off the road).
+                on_road = surf.contains(pt)
+                g = pd.concat([g, gpd.GeoDataFrame([{"name": fix.get("name"), "kind": fix.get("kind"), "subject": "none",
+                                                     "island": bool(on_road), "geometry": pt.buffer(8.0 if on_road else 3.0, quad_segs=6)}],
+                                                   crs=cfg.crs)], ignore_index=True)
+                sel = g.index == len(g) - 1
+            g.loc[sel, "subject"] = fix.get("subject", "none")
+            for key in ("name", "kind"):
                 if key in fix:
                     g.loc[sel, key] = fix[key]
             g.loc[sel, ["source", "confidence"]] = ["Rakshit (chowks.yaml)", "high"]

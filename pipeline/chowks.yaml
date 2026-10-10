@@ -1,0 +1,20 @@
+# Rakshit's corrections for chowks (owner's local knowledge, 2026-10-10).
+# Position: x east, n north in metres from the Trikon Baug origin (positions from Overture places).
+# kind: garden | fountain | statue | sculpture | flag | aircraft | tree
+# subject (statues): gandhi | indira | vivekananda | hanuman | patel | ambedkar | figure
+chowks:
+  - name: Kotecha Chowk
+    x: -2399
+    n: -510
+    kind: aircraft          # a grounded MIG-27 fighter donated by the Indian Air Force
+  - name: Hospital Chowk
+    x: 1
+    n: 998
+    kind: statue
+    subject: ambedkar       # Dr. B. R. Ambedkar statue, near the Civil Hospital
+  - name: Limda Chowk
+    x: -353
+    n: 164
+    kind: tree              # "Limda" = neem: the landmark is the old neem tree
+  # Jubilee Chowk (Mahatma Gandhi) and the Swami Vivekananda statue are already placed from map data.
+  # Bahumali Bhavan Circle (Sardar Patel statue): position not found in OSM/Overture yet.
