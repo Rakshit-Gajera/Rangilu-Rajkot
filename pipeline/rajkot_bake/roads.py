@@ -70,6 +70,15 @@ def run(cfg: C.Config) -> None:
 
     rank = hw.map(lambda h: CLASS_RANK.get(h, 2)).values
     width, rule = zip(*tags.map(geom.road_width))
+    # A flyover named after its road ("150 Foot Ring Road Flyover") is not 150 ft wide: the name gives the
+    # right-of-way of the road below. Bridges use lanes or a two-lane-each-way default instead.
+    is_bridge = np.array([t.get("bridge") not in (None, "no") for t in tags])
+    width = np.array(width, dtype=float)
+    rule = np.array(rule, dtype=object)
+    fix = is_bridge & (rule == "name_feet")
+    width[fix] = [int(t["lanes"]) * geom.LANE_WIDTH if t.get("lanes", "").isdigit() else 7.5
+                  for t in tags[fix]] if fix.any() else []
+    rule[fix] = "bridge_default"
     out = gpd.GeoDataFrame({
         "rid": [f"w{i}" for i in r.osm_id],
         "highway": hw.values,
