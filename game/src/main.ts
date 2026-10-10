@@ -10,6 +10,7 @@ import { worldUniforms } from './render/materials';
 import { Clock, Environment, goldenHour } from './render/sky';
 import { Hud } from './ui/hud';
 import { CityMap } from './ui/map';
+import { PauseMenu } from './ui/pause';
 import { RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
 
@@ -84,6 +85,7 @@ async function main() {
   } catch (e) {
     console.warn('map unavailable', e);
   }
+  const pause = new PauseMenu(quality.name);
   let routeTimer = 0;
   let traveling = false;
   let travelTo: THREE.Vector3 | null = null; // streaming follows the destination while travelling
@@ -143,10 +145,11 @@ async function main() {
     const tFrame = performance.now();
 
     // --- Input-driven actions -------------------------------------------------
-    const mapOpen = !!cityMap?.open;
-    if (mapOpen) {
+    if (!cityMap?.open && input.hit('Escape')) pause.toggle();
+    const mapOpen = !!cityMap?.open || pause.open;
+    if (cityMap?.open) {
       for (const code of ['KeyM', 'Escape', 'KeyF', 'Delete', 'Backspace']) if (input.hit(code)) cityMap!.key(code);
-    } else if (input.hit('KeyM') && cityMap) cityMap.toggle(true);
+    } else if (!pause.open && input.hit('KeyM') && cityMap) cityMap.toggle(true);
     const controls = mapOpen || traveling ? null : input;
     const near = scooter.position.distanceTo(player.position) < 2.6;
     if (controls && input.hit('KeyE')) {
@@ -242,6 +245,8 @@ async function main() {
     ready: true,
     simTime: () => simTime,
     quality: () => quality.name,
+    route: (x0: number, n0: number, x1: number, n1: number) => graph?.route(x0, n0, x1, n1)?.points ?? null,
+    worldStats: () => world.stats(),
     idle: () => world.stats().queued === 0,
     heap: () => (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0,
     geometries: () => renderer.info.memory.geometries,
