@@ -15,7 +15,7 @@ import type { World } from '../world/world';
 
 type Kind = 'vehicle' | 'ped' | 'cow' | 'parked';
 
-interface Agent {
+export interface Agent {
   kind: Kind;
   model: number;
   edge: number;
@@ -33,6 +33,10 @@ interface Agent {
   body?: RAPIER.RigidBody;
   wait: number; // cows: seconds until they move; peds: pause
   check: number; // seconds until the next "am I inside a building?" test
+  talk?: number; // seconds left in a street conversation (actors/talk.ts)
+  faceYaw?: number; // who they're talking to
+  dog?: boolean; // animals: a dog rather than a cow
+  gone?: boolean; // removed from the street
 }
 
 interface Spec { model: ModelName; weight: number; length: number; speed: number; lane: number }
@@ -165,10 +169,10 @@ export class Life {
   }
 
   /** Pick a random routable edge with a point 120–550 m from (x, n). */
-  private spawnPoint(x: number, n: number, minRank: number): { edge: number; fwd: boolean; s: number } | null {
+  private spawnPoint(x: number, n: number, minRank: number, minD = SPAWN_MIN): { edge: number; fwd: boolean; s: number } | null {
     const e = this.graph.data.edges;
     for (let tries = 0; tries < 4; tries++) {
-      const ang = this.rand() * Math.PI * 2, d = SPAWN_MIN + this.rand() * (SPAWN_MAX - SPAWN_MIN);
+      const ang = this.rand() * Math.PI * 2, d = minD + this.rand() * (SPAWN_MAX - minD);
       const u = this.graph.nearestNode(x + Math.cos(ang) * d, n + Math.sin(ang) * d, true);
       const out = this.graph.outgoing(u).filter(([k]) => e.rank[k] >= minRank && !(e.flags[k] & 2));
       if (!out.length) continue;
@@ -184,7 +188,8 @@ export class Life {
 
   private spawn(kind: Kind, px: number, pn: number) {
     const minRank = kind === 'cow' ? 3 : kind === 'ped' ? 3 : 3;
-    const sp = this.spawnPoint(px, pn, minRank);
+    // People may appear closer (they're small, and the street should feel busy around you).
+    const sp = this.spawnPoint(px, pn, minRank, kind === 'ped' ? 55 : SPAWN_MIN);
     if (!sp) return;
     let model: number, length = 1, v0 = 1.3, lane = 0;
     const half = this.roadHalfWidth(sp.edge);
@@ -227,6 +232,7 @@ export class Life {
     this.agents.push({ kind, model, edge: sp.edge, fwd: sp.fwd, s: sp.s, v: kind === 'vehicle' ? v0 * 0.6 : v0, v0, lane,
       length, x: 0, n: 0, y: 0, yaw: 0, honk: 0, wait: this.rand() * 20, check: 0 });
     this.counts[kind]++;
+    if (kind === 'cow') this.agents[this.agents.length - 1].dog = MODELS[model].startsWith('dog');
   }
 
   /** Next edge at the end node: never a U-turn unless it's a dead end; bigger roads preferred. */
@@ -335,6 +341,9 @@ export class Life {
         } else a.honk = 1 + this.rand();
       } else if (a.kind === 'parked') {
         a.v = 0;
+      } else if (a.kind === 'ped' && a.talk && a.talk > 0) {
+        a.talk -= dt; // chatting: stand still
+        a.v = 0;
       } else if (a.kind === 'ped') {
         a.wait -= dt;
         a.v = a.wait > 0 && a.wait < 3 ? 0 : a.v0; // pause now and then
@@ -356,7 +365,7 @@ export class Life {
       const ground = this.world.terrainAt(a.x, -a.n);
       if (ground === null || Math.hypot(a.x - px, a.n - pn) > DESPAWN) { this.remove(k); continue; }
       a.y = ground + (a.kind === 'ped' ? 0.15 : 0.02);
-      a.yaw = Math.atan2(p.dx, p.dn);
+      a.yaw = a.talk && a.talk > 0 && a.faceYaw !== undefined ? a.faceYaw : Math.atan2(p.dx, p.dn);
       if (this.insideBuilding(a, px, pn, dt)) {
         // Mapped roads and building outlines don't always agree: people step back onto the road,
         // vehicles and cows standing in a wall are removed (they respawn elsewhere).
@@ -392,6 +401,36 @@ export class Life {
       if (a.kind === 'vehicle') vehicles++; else if (a.kind === 'ped') peds++;
     }
     return { vehicles, peds };
+  }
+
+  /** A person standing at the roadside 25–45 m from (x, n) (someone to chat with), or null. */
+  pedestrianNear(x: number, n: number): Agent | null {
+    const ang = this.rand() * Math.PI * 2, d = 25 + this.rand() * 20;
+    const u = this.graph.nearestNode(x + Math.cos(ang) * d, n + Math.sin(ang) * d, true);
+    const [ux, un] = this.graph.nodeXY(u);
+    if (Math.hypot(ux - x, un - n) < 15 || Math.hypot(ux - x, un - n) > 70) return null;
+    const out = this.graph.outgoing(u).filter(([k]) => !(this.graph.data.edges.flags[k] & 2));
+    if (!out.length) return null;
+    const [edge, fwd] = out[Math.floor(this.rand() * out.length)];
+    const half = this.roadHalfWidth(edge);
+    const lane = (this.rand() < 0.5 ? 1 : -1) * (this.graph.data.edges.rank[edge] >= 6 ? half + 1.2 : Math.max(0.6, half - 0.5));
+    const a: Agent = { kind: 'ped', model: MODELS.indexOf(PEDS[Math.floor(this.rand() * PEDS.length)]), edge, fwd,
+      s: Math.min(4, this.graph.edgeLength(edge) / 2), v: 0, v0: 1.2, lane, length: 1, x: ux, n: un, y: 0, yaw: 0, honk: 0,
+      wait: 20, check: 0 };
+    this.agents.push(a);
+    this.counts.ped++;
+    return a;
+  }
+
+  /** A friend who stops beside `a` for a chat (actors/talk.ts): a new person on the same street, 1.2 m along. */
+  companion(a: Agent): Agent | null {
+    if (a.kind !== 'ped') return null;
+    const model = MODELS.indexOf(PEDS[Math.floor(this.rand() * PEDS.length)]);
+    const b: Agent = { ...a, model, s: Math.min(a.s + 1.2, this.graph.edgeLength(a.edge)), lane: a.lane + (a.lane > 0 ? -0.5 : 0.5),
+      body: undefined, talk: 0, faceYaw: undefined, gone: false, wait: 20 + this.rand() * 10, check: 1 };
+    this.agents.push(b);
+    this.counts.ped++;
+    return b;
   }
 
   /** The nearest cow or dog within r metres, for petting (E). */
@@ -463,6 +502,7 @@ export class Life {
     const a = this.agents[k];
     if (a.body) this.physics.world.removeRigidBody(a.body);
     this.counts[a.kind]--;
+    a.gone = true;
     this.agents.splice(k, 1);
   }
 

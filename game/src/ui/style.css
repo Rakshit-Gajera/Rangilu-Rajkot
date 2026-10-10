@@ -203,3 +203,53 @@ body.touch #speed { bottom: 160px; }
 #pause .keys button { width: auto; min-width: 90px; padding: 4px 10px; background: #292524; color: #ffd28a; border: 1px solid #57534e; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 #pause h2 small.build { font-size: 11px; color: #a8a29e; font-weight: 400; margin-left: 8px; }
+
+/* Map (M): stage with zoom controls; the side panel becomes a drawer on small screens */
+#citymap .map-stage { position: relative; min-width: 0; min-height: 0; }
+#citymap .map-zoom { position: absolute; right: 14px; bottom: 50px; display: grid; gap: 8px; }
+#citymap .map-zoom button, #citymap .map-close, #citymap .map-panel-toggle {
+  width: 46px; height: 46px; border-radius: 12px; border: 1px solid #57534e; background: rgba(28, 25, 23, 0.92);
+  color: #fff; font-size: 22px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+#citymap .map-zoom button:active, #citymap .map-close:active { background: #f59e0b; color: #1c1917; }
+#citymap .map-close { position: absolute; right: 14px; top: 14px; font-size: 18px; }
+#citymap .map-panel-toggle { display: none; position: absolute; left: 14px; top: 14px; width: auto; padding: 0 14px; font-size: 14px; }
+#citymap aside li { padding: 6px 4px; cursor: pointer; border-bottom: 1px solid #292524; font-size: 14px; }
+#citymap aside li:hover { color: #ffd28a; }
+#citymap aside ul { list-style: none; padding: 0; margin: 0; }
+@media (max-width: 760px) {
+  #citymap { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  #citymap aside { position: absolute; left: 0; right: 0; bottom: 0; max-height: 55vh; transform: translateY(100%);
+    transition: transform 0.25s ease; border-top: 1px solid #44403c; border-left: 0; border-radius: 14px 14px 0 0; }
+  #citymap.panel-open aside { transform: none; }
+  #citymap .map-panel-toggle { display: block; }
+}
+
+/* Phones: no touch buttons over the title screen; a compact title in landscape */
+body.in-title #touch, body.in-title #hud { display: none; }
+@media (max-height: 520px) {
+  #title { padding: 10px 14px; grid-template-rows: auto 1fr; gap: 6px; }
+  #title .brand h1 { font-size: 30px; }
+  #title .brand p { font-size: 13px; margin-top: 2px; }
+  #title .setup { align-self: end; max-height: calc(100vh - 90px); overflow: auto; padding: 10px 14px; gap: 5px; width: min(520px, 100%); }
+  #title .swatches button { width: 28px; height: 28px; }
+  #title input { padding: 6px 8px; font-size: 15px; }
+  #title .actions { position: sticky; bottom: 0; background: rgba(28, 25, 23, 0.95); padding-top: 6px; }
+}
+@media (max-width: 520px) {
+  #title .brand h1 { font-size: 38px; }
+  #title .setup { justify-self: stretch; }
+}
+/* Notches and rounded corners */
+#hud, #touch { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#touch .stick { left: calc(24px + env(safe-area-inset-left)); }
+#touch .buttons { right: calc(16px + env(safe-area-inset-right)); }
+
+/* Street conversations: speech bubbles over people */
+#talk { position: fixed; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
+#talk .bubble { position: absolute; left: 0; top: 0; background: #fffdf7; color: #1c1917; border-radius: 12px; padding: 5px 10px 6px;
+  font-size: 14px; line-height: 1.25; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); text-align: center; white-space: nowrap; zoom: var(--ui, 1); }
+#talk .bubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent;
+  border-bottom: 0; border-top-color: #fffdf7; }
+#talk .bubble b { display: block; font-family: 'Noto Sans Gujarati', 'Noto Sans', sans-serif; font-weight: 600; }
+#talk .bubble small { color: #78716c; font-size: 11px; }
+body.in-title #talk { display: none; }

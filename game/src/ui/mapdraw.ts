@@ -6,6 +6,9 @@ const STYLE: Record<number, [string, number]> = {
   4: ['#a8a29e', 1.8], 3: ['#a8a29e', 1.5], 2: ['#78716c', 1.1], 1: ['#57534e', 0.9],
 };
 
+/** Typical carriageway width by road rank, metres. */
+const REAL_W: Record<number, number> = { 9: 14, 8: 14, 7: 12, 6: 9, 5: 7, 4: 6, 3: 5, 2: 4, 1: 3 };
+
 /** Spatial index of graph edges in 250 m cells, so a view only touches nearby roads. */
 export class EdgeIndex {
   private cells = new Map<number, number[]>();
@@ -80,7 +83,8 @@ export function drawRoads(ctx: CanvasRenderingContext2D, idx: EdgeIndex, v: View
   for (const rank of [...byRank.keys()].sort((a, b) => a - b)) {
     const [col, w] = STYLE[rank] ?? STYLE[3];
     ctx.strokeStyle = col;
-    ctx.lineWidth = Math.max(0.6, w * widthScale);
+    // Zoomed in, roads take their real carriageway width (metres × pixels per metre).
+    ctx.lineWidth = Math.max(0.6, w * widthScale, (REAL_W[rank] ?? 5) * v.scale);
     ctx.beginPath();
     for (const k of byRank.get(rank)!) {
       for (let q = e.start[k]; q < e.start[k + 1]; q++) {

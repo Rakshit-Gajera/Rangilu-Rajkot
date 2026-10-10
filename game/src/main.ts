@@ -30,6 +30,7 @@ import { CityMap } from './ui/map';
 import { Life } from './actors/life';
 import { Signals } from './world/signals';
 import { LandmarkModels } from './world/landmarks';
+import { StreetTalk } from './actors/talk';
 import { PauseMenu } from './ui/pause';
 import { distanceToPolyline, RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
@@ -113,7 +114,8 @@ async function main() {
     Object.assign(spawn, { x, z: -n, heading });
   }
   // Playable once the ground around the spawn is in (PROMPT §8.1); the rest streams in the background.
-  await world.ensure(spawn.x, spawn.z, 350, (d, t) => { bar.style.width = `${(100 * d) / t}%`; });
+  // Low preset (phones): a smaller first ring, so you're in sooner; the rest streams in around you.
+  await world.ensure(spawn.x, spawn.z, quality.name === 'low' ? 220 : 350, (d, t) => { bar.style.width = `${(100 * d) / t}%`; });
 
   // Rapier scene queries only see new colliders after a step, so spawn heights come from the tile grid.
   const gy = world.terrainAt(spawn.x, spawn.z) ?? 30;
@@ -234,6 +236,7 @@ async function main() {
     ...graph.data.labels.filter((l) => l.kind === 'chowk'), ...(graph.data.chowks ?? []).map(([x, n]) => ({ x, n }))]) : null;
   if (life) life.signals = signals;
   if (life && home) life.denseZones.push({ x: home.x, n: home.n, r: 800 });
+  const talk = life ? new StreetTalk(life, camera, audio) : null;
   const landmarkModels = new LandmarkModels(graph?.data.sites ?? [], scene, physics, shadowSize > 0);
   const cityMap = graph ? new CityMap(graph, {
     player: () => { const p = here(); return { x: p.x, n: -p.z, heading: -follow.yaw }; },
@@ -241,6 +244,7 @@ async function main() {
     onClearWaypoint: () => { routeTimer = 0; },
     onFastTravel: (x, n) => { void fastTravel(x, n, true); },
     home,
+    strings: world.strings,
   }) : null;
   function updateRoute(dt: number) {
     if (!graph || !cityMap?.waypoint) return;
@@ -509,9 +513,17 @@ async function main() {
     : new TitleScreen(settings, player.character, (st) => { storeSettings(st); document.getElementById('help')!.textContent = t('help'); });
   if (!title) titleDoneResolve();
   if (title) {
+    document.body.classList.add('in-title');
     document.getElementById('hud')!.hidden = true;
     void world.ensure(raceCourse.x, -raceCourse.n, 300);
     void title.wait().then(() => {
+      document.body.classList.remove('in-title');
+      // Phones: go full screen and landscape when you press Play (a user gesture allows it).
+      if (touch) {
+        void document.documentElement.requestFullscreen?.().then(() => {
+          (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {});
+        }).catch(() => {});
+      }
       titleDoneResolve();
       fixedView = null;
       document.getElementById('hud')!.hidden = false;
@@ -645,6 +657,7 @@ async function main() {
     lifeMs = lifeMs * 0.95 + (performance.now() - tLife) * 0.05;
     keepAboveGround();
     if (signals) { const h = here(); signals.update(dt, h.x, -h.z, (x, n) => world.terrainAt(x, -n)); }
+    if (talk && !cityMap?.open) talk.update(dt, here(), worldUniforms.uNight.value);
     {
       const c = freeCam || fixedView ? camera.position : here();
       landmarkModels.update(dt, c.x, -c.z, (x, n) => world.terrainAt(x, -n));
@@ -713,7 +726,9 @@ async function main() {
       renderer.shadowMap.autoUpdate = false;
       renderer.shadowMap.needsUpdate = quality.name === 'medium' || frameNo % 2 === 0 || !!fixedView;
     }
-    if (photo.open) {
+    // The full map covers the screen: skip drawing the 3D city behind it (it's what made the map laggy).
+    const skip3d = !!cityMap?.open;
+    if (skip3d) { /* no 3D frame */ } else if (photo.open) {
       // Focus on whatever is in the middle of the view (for depth of field).
       const dir = camera.getWorldDirection(new THREE.Vector3());
       const hit = physics.world.castRay(new physics.R.Ray(camera.position, dir), 500, true);
@@ -793,7 +808,7 @@ async function main() {
       });
       return out;
     },
-    agents: () => (life?.agents ?? []).map((a) => ({ kind: a.kind, x: a.x, n: a.n, y: a.y, yaw: a.yaw, v: a.v })),
+    agents: () => (life?.agents ?? []).map((a) => ({ kind: a.kind, x: a.x, n: a.n, y: a.y, yaw: a.yaw, v: a.v, talk: a.talk ?? 0 })),
     debugScene: () => { const out: Record<string, number> = {}; scene.traverse((o) => { const mm = o as THREE.Mesh; if (mm.isMesh) { const k = (mm.material as THREE.Material).type + ((mm.material as THREE.MeshStandardMaterial).map ? ":map" : "") + (mm.visible ? "" : ":hidden") + ((mm.material as THREE.MeshStandardMaterial).map ? "@" + mm.parent?.name : ""); out[k] = (out[k] ?? 0) + 1; } }); return out; },
     signals: () => ({ count: signals?.junctions.length ?? 0, near: (signals?.junctions ?? []).map((j) => [Math.round(j.x), Math.round(j.n)]).sort((a, b) => Math.hypot(a[0] - here().x, a[1] + here().z) - Math.hypot(b[0] - here().x, b[1] + here().z)).slice(0, 3) }),
     roadNear: (x: number, n: number) => (graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n]),

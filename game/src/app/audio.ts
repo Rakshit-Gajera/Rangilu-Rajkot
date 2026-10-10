@@ -107,6 +107,96 @@ export class Audio {
     this.amb.update(dt, levels);
   }
 
+  /** Volume for a sound d metres away (0 beyond `max`). */
+  private near(d: number, max: number) { return Math.max(0, 1 - d / max) ** 1.5; }
+
+  /** A cow's moo: a low, nasal "mmm-ooo" that rises and falls. */
+  moo(distance: number) {
+    const ctx = this.ctx;
+    const v = this.near(distance, 60);
+    if (!ctx || v <= 0) return;
+    const t = ctx.currentTime, len = 1.1 + Math.random() * 0.6;
+    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth';
+    const base = 95 + Math.random() * 25;
+    o.frequency.setValueAtTime(base * 0.9, t);
+    o.frequency.linearRampToValueAtTime(base * 1.12, t + len * 0.35);
+    o.frequency.linearRampToValueAtTime(base * 0.82, t + len);
+    f.type = 'bandpass';
+    f.Q.value = 2.5;
+    f.frequency.setValueAtTime(320, t);
+    f.frequency.linearRampToValueAtTime(720, t + len * 0.4); // mmm -> ooo
+    f.frequency.linearRampToValueAtTime(500, t + len);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35 * v, t + 0.15);
+    g.gain.setValueAtTime(0.35 * v, t + len * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(f).connect(g).connect(this.master!);
+    o.start(t);
+    o.stop(t + len + 0.05);
+  }
+
+  /** A street dog's bark: two or three sharp "wuf"s. */
+  bark(distance: number) {
+    const ctx = this.ctx;
+    const v = this.near(distance, 70);
+    if (!ctx || v <= 0) return;
+    const n = 1 + Math.floor(Math.random() * 3);
+    const pitch = 380 + Math.random() * 220;
+    for (let k = 0; k < n; k++) {
+      const t = ctx.currentTime + k * (0.22 + Math.random() * 0.08);
+      const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(pitch, t);
+      o.frequency.exponentialRampToValueAtTime(pitch * 0.55, t + 0.13);
+      f.type = 'bandpass';
+      f.frequency.value = 900;
+      f.Q.value = 1.2;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22 * v, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      o.connect(f).connect(g).connect(this.master!);
+      o.start(t);
+      o.stop(t + 0.17);
+    }
+  }
+
+  /**
+   * Someone talking (no words — a voice-like babble): syllables shaped by vowel formants at the speaker's
+   * pitch, so a conversation sounds like a conversation from a few metres away.
+   */
+  speak(distance: number, pitch: number, syllables: number) {
+    const ctx = this.ctx;
+    const v = this.near(distance, 22);
+    if (!ctx || v <= 0) return;
+    const VOWELS = [[800, 1200], [400, 2000], [300, 2300], [450, 800], [350, 700], [600, 1700]];
+    let t = ctx.currentTime;
+    for (let k = 0; k < syllables; k++) {
+      const len = 0.09 + Math.random() * 0.1;
+      const [f1, f2] = VOWELS[Math.floor(Math.random() * VOWELS.length)];
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      const p = pitch * (0.92 + Math.random() * 0.18) * (k === syllables - 1 ? 0.88 : 1); // falls at the end
+      o.frequency.setValueAtTime(p, t);
+      o.frequency.linearRampToValueAtTime(p * (0.95 + Math.random() * 0.1), t + len);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.08 * v, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      for (const [f, q] of [[f1, 6], [f2, 9]]) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = f;
+        bp.Q.value = q;
+        o.connect(bp).connect(g);
+      }
+      g.connect(this.master!);
+      o.start(t);
+      o.stop(t + len + 0.02);
+      t += len + (Math.random() < 0.2 ? 0.12 : 0.03);
+    }
+  }
+
   /** Short UI cues for activities: ding (checkpoint), good (paid), bad (late). */
   chime(kind: 'ding' | 'good' | 'bad') {
     const ctx = this.ctx;

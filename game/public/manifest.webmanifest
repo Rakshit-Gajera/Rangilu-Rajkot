@@ -1,0 +1,11 @@
+{
+  "name": "Rangilu Rajkot",
+  "short_name": "Rajkot",
+  "description": "The whole of Rajkot, 1:1, in your browser.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1c1917",
+  "theme_color": "#1c1917",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
