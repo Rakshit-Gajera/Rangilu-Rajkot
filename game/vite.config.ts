@@ -33,6 +33,8 @@ function worldPackage(): Plugin {
 
 export default defineConfig({
   base: './',
+  // Shown in the Esc menu, so you can tell which build is live.
+  define: { __BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC') },
   plugins: [wasm(), worldPackage()],
   worker: { format: 'es', plugins: () => [wasm()] },
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },

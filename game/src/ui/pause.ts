@@ -1,5 +1,7 @@
 import { PRESETS, storeQuality, type QualityName } from '../app/quality';
 import type { Input } from '../app/input';
+
+declare const __BUILD__: string;
 import { ACTIONS, storeSettings, type Settings } from '../app/settings';
 
 const keyName = (code: string) => code.replace(/^Key/, '').replace(/^Digit/, '').replace('Left', ' (left)').replace('Right', ' (right)');
@@ -19,7 +21,7 @@ export class PauseMenu {
       .join('');
     this.root.innerHTML = `
       <div class="panel">
-        <h2>Paused</h2>
+        <h2>Paused <small class="build">build ${__BUILD__}</small></h2>
         <button id="pause-resume">Resume</button>
         <label>Graphics quality
           <select id="pause-quality">${options}</select>
