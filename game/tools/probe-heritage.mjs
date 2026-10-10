@@ -1,0 +1,16 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 960, height: 540 } });
+const errs = [];
+p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 400)); });
+await p.goto('http://localhost:5173/?shadows=0&date=2026-10-09');
+await p.waitForFunction(() => window.__game?.ready, null, { timeout: 120000 });
+await p.evaluate(() => window.__game.ensure(0, -595, 300));
+const y = await p.evaluate(() => window.__game.terrain(-40, -560));
+await p.evaluate((y) => window.__game.setView([-40, y + 4, -560], [1, y + 6, -595], 10), y);
+await p.waitForTimeout(1000);
+await p.waitForFunction(() => window.__game.idle(), null, { timeout: 120000 });
+await p.waitForTimeout(800);
+await p.screenshot({ path: '../shots/43-watson-heritage.png' });
+console.log(errs.join('\n') || 'no errors');
+await b.close();

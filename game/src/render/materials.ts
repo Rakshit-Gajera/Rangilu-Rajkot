@@ -111,6 +111,20 @@ ${GLSL_COMMON}`)
         if (w > 0.5 && (front || fHash(vec2(bay, seed * 5.0)) > 0.6)) { col = vec3(0.22, 0.25, 0.28); rough = 0.3; }
         col *= y < 0.45 ? 0.7 : 1.0; // plinth band
       }
+    } else if (zi == 1 && !back) {
+      // Heritage (Z2): tall arched openings between pilasters, a cornice band at each floor.
+      float pil = step(lu, 0.1) + step(0.9, lu);
+      float cornice = step(0.9, lv);
+      vec2 q = vec2((lu - 0.5) / 0.28, (lv - 0.12) / 0.62);
+      float arch = step(q.y, 1.0) * step(0.0, q.y) * step(abs(q.x), 1.0)
+                 * step(length(vec2(q.x, max(q.y - 0.72, 0.0) / 0.28)), 1.0);
+      if (pil > 0.5 || cornice > 0.5) { col = plaster * 1.08; rough = 0.7; }
+      else if (arch > 0.5) {
+        col = vec3(0.16, 0.13, 0.11) * (0.7 + 0.3 * detail);
+        rough = 0.5;
+        float lit = step(fHash(vec2(bay * 5.0 + seed * 17.0, floorIdx)), 0.45);
+        emis = vec3(1.0, 0.82, 0.55) * lit * uNight * 0.7;
+      }
     } else if (isZ4 && front && style > 0.35) {
       // Glass-front commercial complex: continuous glazing bands per floor.
       float g = fBox(vec2(lu, lv), vec2(0.02, 0.18), vec2(0.98, 0.92));

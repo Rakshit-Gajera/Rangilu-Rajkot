@@ -1,6 +1,8 @@
 # Plan
 
-Current phase: **P2 — Whole city** (PROMPT.md §13). Gate: cross-city drive without hitches (Rakshit).
+Current phase: **P3 — Make it look like Rajkot** (PROMPT.md §13). Gate: ≥ 8/10 street screenshots recognised by Rakshit.
+
+P2 gate passed (Rakshit, 2026-10-10).
 
 ## P2 tasks
 - [x] 2.1 Bake every tile (1,308) — `.rtile` v2 polygons, gzipped region packs (11.6 MB)
@@ -14,9 +16,19 @@ Current phase: **P2 — Whole city** (PROMPT.md §13). Gate: cross-city drive wi
 - [x] 2.8b Independent review → fixes
 - [ ] 2.9 Rakshit: cross-city drive on his laptop (gate)
 
-## Next phase
-P3 — make it look like Rajkot (recognition gate ≥ 8/10): trees, footpaths and kerbs, street lights and poles,
-bilingual signboards with text, roof variety, flyovers' look, lakes and dams, the 20 landmarks.
+## P3 tasks (Rakshit's priorities first: chowks, statues, flyovers)
+- [x] 3.1 Flyovers profiled as whole structures (no humps), widths from lanes, pillars, grey undersides
+- [x] 3.2 Chowks: 50 roundabout islands with black-and-yellow kerbs, gardens, marigolds, lamps; real names (25)
+- [x] 3.3 Statues from sourced places (Gandhi, Indira Gandhi, Vivekananda, Hanumanji); fountains, sculptures, flags
+- [x] 3.4 Trees: 117k (neem, peepal, banyan, gulmohar, ashoka, palm, babool), instanced
+- [x] 3.5 Street lights, electric poles with wires, night light pools
+- [x] 3.6 Bilingual shop signboards (English + Gujarati)
+- [x] 3.7 Heritage (Z2) facade: arches, pilasters, cornices
+- [ ] 3.8 Footpaths, kerbs and medians on main roads
+- [ ] 3.9 Landmark models (Race Course ground, Watson Museum, Rajkot Junction, Rajkumar College, …) — need reference photos / Rakshit
+- [ ] 3.10 Lakes and dams (Aji-1, Nyari-1, Lalpari): embankments, water look
+- [ ] 3.11 Roof variety (Mangalore tiles in Z1/Z7, solar panels, dish antennas)
+- [ ] 3.12 Review → recognition gate
 
 ## Done
 - P0 — data recon. P1 — vertical slice (gate: streets not yet recognisable → P3).
