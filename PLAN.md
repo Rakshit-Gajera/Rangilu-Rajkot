@@ -11,6 +11,7 @@ Current phase: **P2 — Whole city** (PROMPT.md §13). Gate: cross-city drive wi
 - [x] 2.6 Quality presets (auto) + pause menu + dynamic resolution
 - [x] 2.7 Engine bundle under 1.5 MB gzip (physics WASM split out)
 - [x] 2.8 Cross-city tour test: 17 km route + repeated city tour, no errors, no growth in memory
+- [x] 2.8b Independent review → fixes
 - [ ] 2.9 Rakshit: cross-city drive on his laptop (gate)
 
 ## Next phase

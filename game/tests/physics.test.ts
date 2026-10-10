@@ -23,3 +23,23 @@ describe('terrain heightfield collider', () => {
     }
   });
 });
+
+describe('collider chunking', async () => {
+  const { chunkTrimesh } = await import('../src/physics/physics');
+  it('splits a mesh into compact chunks that keep every triangle', () => {
+    const n = 10_000;
+    const pos = new Float32Array(n * 9).map((_, k) => k * 0.01);
+    const idx = new Uint32Array(n * 3).map((_, k) => k);
+    const chunks = chunkTrimesh(pos, idx, 1500);
+    expect(chunks.length).toBe(Math.ceil(n / 1500));
+    let tris = 0;
+    for (const [p, i] of chunks) {
+      tris += i.length / 3;
+      expect(Math.max(...i)).toBeLessThan(p.length / 3);
+    }
+    expect(tris).toBe(n);
+    // First triangle of the second chunk keeps its original coordinates.
+    const [p1, i1] = chunks[1];
+    expect(p1[i1[0] * 3]).toBeCloseTo(pos[1500 * 9]);
+  });
+});

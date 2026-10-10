@@ -11,8 +11,10 @@
   map and minimap, F to fast travel, arrival message. Race Course → Rajkot Junction routes on real roads.
 - Quality presets Low/Medium/High/Ultra (auto-picked, changeable in the Esc menu), dynamic resolution.
 - Engine download 1.40 MB gzip (physics WASM separate).
-- Tests: 36 vitest, 19 pytest, 4 Playwright (boot + 10 viewpoints, walk/ride, map/GPS/fast travel,
-  17 km cross-city tour with a leak check: second round identical to the first, heap ≈ 60 MB).
+- Independent P2 review: 6 must-fix issues fixed (parked scooter falling, map edge, collider hitches, holes on
+  eviction, duplicate builds, meaningless memory test) + GPS on the main network, cheaper re-routing.
+- Tests: 38 vitest, 19 pytest, 4 Playwright (boot + 10 viewpoints, walk/ride, map/GPS/fast travel, 17 km
+  cross-city tour on High: heap 77–158 MB and stable, game main-thread p99 23 ms, 0 errors).
 
 **Next**
 - P2 gate: Rakshit rides across the city (e.g. Race Course → Darshan University with M + waypoint) and reports hitches.
@@ -21,6 +23,7 @@
 **Known issues**
 - The city still looks generic (no trees, footpaths, street lights, sign text, landmark models) — P3.
 - Far tiles have no facade detail; at night the far city is only a faint glow.
+- Real-GPU frame times not measured yet (tests use a software renderer) — Rakshit's F3 numbers needed.
 - Only 36 map labels (OSM has few neighbourhood names here); road names appear on the area banner.
 - No IndexedDB pack cache yet (the browser HTTP cache covers repeat visits).
 - Character and scooter are placeholders; lane markings double up at tile seams.

@@ -91,3 +91,21 @@ Format: date · decision · why · alternatives considered.
   preference for bigger roads; fast travel snaps to the nearest ground-level road node (never a flyover deck).
 - **Quality preset auto-pick** from renderer string / cores / memory / mobile, overridable in the pause menu
   (saved in localStorage, works without it) or with `?quality=`. Dynamic resolution holds the target frame rate.
+
+## 2026-10-10 · P2 review fixes
+- **Colliders also around the parked scooter**, and the scooter is frozen (body disabled) while the tile under it
+  has no colliders yet — it can never fall through the world while you walk away.
+- **Invisible walls on tile sides with no neighbour** + "You've reached the edge of Rajkot" message (§7.1);
+  the safety net sends you to the nearest ground-level road if you are outside the world or below the terrain.
+- **Collider creation is incremental:** heightfield first (you can stand on a tile at once), then walls, then
+  building/bridge trimeshes in 1,500-triangle chunks, all inside the per-frame budget.
+- **At most one near tile and three far tiles uploaded per frame** (a near tile can be several MB of geometry).
+  CPU copies of render arrays are dropped after the first GPU upload (≈ half the geometry memory).
+- **Builds are de-duplicated** (one job per tile and LOD until it is added); `ensure()` shares the same jobs.
+- **Far meshes for every tile in range**, and a near tile is only evicted once its far mesh exists — no holes.
+- **GPS snaps to the largest connected road network** (45 small disconnected bits exist in OSM) and re-routes
+  only when you leave the route (> 40 m) or every 15 s.
+- **Dynamic resolution changes at most every 5 s, in 0.1–0.15 steps:** a pixel-ratio change reallocates the
+  drawing buffers (measured 450 ms in the software renderer).
+- **Gate test** runs the High preset with precise memory: heap 77–158 MB across the city, identical across rounds;
+  main-thread game work p50 3 ms, p99 23 ms (software renderer, rendering excluded).
