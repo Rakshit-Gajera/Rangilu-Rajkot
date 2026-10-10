@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-10-10 · Session 3 — P3 look of Rajkot, P4 life, P5 sandbox and activities
+**Done**
+- P3 (Rakshit's priorities): flyovers as whole structures, 56 chowks (fountains, gardens, statues incl. Gandhi,
+  Ambedkar, Sardar Patel at Bahumali Bhavan Circle, the MIG-27 at Kotecha Chowk, the old neem at Limda Chowk),
+  117k trees, street lights and wires, bilingual shop signboards, heritage facades, footpaths with painted kerbs.
+- P4: traffic on the real road graph (keep-left, IDM spacing, horns), pedestrians, cows; time-of-day density.
+- Fixes from Rakshit's test drive: detailed jointed character (face, hair, hands, outfits, riding pose), rounded
+  scooter, horn only on a vehicle, scooter falling/vanishing (ground safety net, parked vehicles locked upright,
+  traffic stops for parked vehicles), people/vehicles inside buildings, High/Ultra frame rate (tree LOD layer:
+  1.55 M → 0.80 M triangles per frame on High, tree shadow triangles 1.1 M → 19 k).
+- P5: every vehicle drivable (bicycle … bus, tractor) and any traffic vehicle can be taken with E; sandbox menu
+  (Tab: spawn vehicles and props, time/season/weather/traffic/people); weather (haze, monsoon rain, wet roads,
+  rivers filling July–September); drone camera and photo mode; discovery log (25 landmark cards); five
+  activities (rickshaw rides, farsan delivery, Race Course time trial, BRTS driver, Navratri garba); money,
+  outfit and food shop; saves with export/import; traffic signals at 43 junctions; city ambience sounds.
+- Repo fix: `game/src/world/` had been hidden by the `world/` ignore rule; it is now in the repo.
+
+**Next**
+- P5 gate: Rakshit's fun check (activities, vehicles, sandbox), F3 numbers on High/Ultra on his laptop.
+- Open: landmark models (need photos), lakes/dams, roof variety, road medians, kite fight and gully cricket.
+
+**Known issues**
+- Software-renderer tests can't show real-GPU frame rates; High/Ultra need Rakshit's F3 numbers after the tree LOD fix.
+- Some junctions that have signals in reality are missing (only main-road crossings get them).
+- Riverbed water is a recolour of the dry bed (no flow or depth).
+
 ## 2026-10-10 · Session 2 — P2 whole city
 **Done**
 - P1 gate: Rakshit couldn't recognise the streets (→ P3), frame rate fine. P2 started on his request.

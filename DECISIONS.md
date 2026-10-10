@@ -109,3 +109,22 @@ Format: date · decision · why · alternatives considered.
   drawing buffers (measured 450 ms in the software renderer).
 - **Gate test** runs the High preset with precise memory: heap 77–158 MB across the city, identical across rounds;
   main-thread game work p50 3 ms, p99 23 ms (software renderer, rendering excluded).
+
+## 2026-10-10 · P4–P5
+- **Traffic is kinematic agents on the road graph**, not physics vehicles: IDM car-following, lane offsets from the
+  real carriageway width (map.json edge widths), colliders only within 40 m. Taking a traffic vehicle (E) swaps the
+  agent for a drivable physics vehicle of the same type.
+- **One vehicle class for every drivable type** (`actors/vehicle.ts`): Rapier ray-cast vehicle with per-type mass,
+  engine, wheels and seat; two-wheelers use four close-set virtual wheels and lean visually. Parked vehicles have
+  pitch and roll locked, so a riderless scooter can't tip, slide or be shoved under the ground.
+- **Trees as one city-wide instanced layer** rebuilt when you move 12 m or turn 16°: full models within ~70–160 m
+  (the only ones casting shadows), low-poly ones ahead out to the tree radius. Small props cast no shadows.
+- **Nearest-node queries use a 100 m grid** (traffic spawning used to scan all 37k nodes several times per frame).
+- **Signals only where main roads cross at grade:** junction nodes within 40 m form one junction; chowks,
+  roundabout ways and untagged rings of tangential one-way segments are excluded. Two phases, 40 s cycle.
+- **Weather is shader uniforms + one rain draw call:** uWet darkens roads and makes them glossy with puddles,
+  greens the grass; uRiver fills riverbeds (season or heavy rain). Rain streaks are a camera-following box.
+- **Activities implement canStart/start/update/end** (`activities/`), never lock the world (X quits), and use
+  real places (map labels, named roads) for destinations; best scores and money live in the save.
+- **Saves are sanitized on load and import** (imported files are untrusted); the game runs without storage.
+- **Discovery facts are kept to well-documented basics** with a named source per card; unsure details were left out.
