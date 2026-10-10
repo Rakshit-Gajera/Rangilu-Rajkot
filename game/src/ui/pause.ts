@@ -31,9 +31,11 @@ export class PauseMenu {
     document.body.appendChild(this.root);
     this.root.querySelector('#pause-resume')!.addEventListener('click', () => this.toggle(false));
     this.root.querySelector('#pause-quality')!.addEventListener('change', (e) => {
-      storeQuality((e.target as HTMLSelectElement).value as QualityName);
+      const q = (e.target as HTMLSelectElement).value as QualityName;
+      storeQuality(q);
+      // Also carried in the URL, so the choice survives the reload even without storage.
       const url = new URL(location.href);
-      url.searchParams.delete('quality');
+      url.searchParams.set('quality', q);
       location.replace(url);
     });
   }

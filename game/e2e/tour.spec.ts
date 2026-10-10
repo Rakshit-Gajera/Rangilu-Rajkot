@@ -30,13 +30,14 @@ test('cross-city tour streams without errors and without leaking', async ({ page
   mkdirSync(OUT, { recursive: true });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto('/?shadows=0&date=2026-10-09');
+  await page.goto('/?shadows=0&quality=high&dynres=0&date=2026-10-09');
   await page.waitForFunction(() => (window as any).__game?.ready, null, { timeout: 120_000 });
   await settle(page);
 
   const route: number[] = await g(page, 'route(-1067, 473, -2123, 16169)');
   expect(route && route.length).toBeGreaterThan(20);
   let maxQueue = 0, steps = 0, last: [number, number] | null = null;
+  const frameMs: number[] = [];
   for (let q = 0; q < route.length - 2; q += 2) {
     const x = route[q], n = route[q + 1];
     if (last && Math.hypot(x - last[0], n - last[1]) < 150) continue;
@@ -44,6 +45,7 @@ test('cross-city tour streams without errors and without leaking', async ({ page
     await viewAt(page, x, n, ahead[ahead.length - 2], ahead[ahead.length - 1]);
     await page.waitForTimeout(160); // ~150 m per frame-burst: faster than riding at 85 km/h
     maxQueue = Math.max(maxQueue, (await g(page, 'worldStats()')).queued);
+    frameMs.push(...(await g(page, 'frameTimes()')));
     last = [x, n];
     steps++;
   }
@@ -62,7 +64,10 @@ test('cross-city tour streams without errors and without leaking', async ({ page
     }
   }
   const max = (r: typeof rounds[0], k: keyof typeof rounds[0][0]) => Math.max(...r.map((v) => v[k]));
-  const report = { steps, maxQueue, rounds, failures: (await g(page, 'worldStats()')).failures, errors };
+  frameMs.sort((a, b) => a - b);
+  const pct = (q: number) => frameMs[Math.min(frameMs.length - 1, Math.floor(q * frameMs.length))];
+  const worst = await g(page, 'worst()');
+  const report = { steps, maxQueue, worst, cpuFrameMs: { p50: pct(0.5), p99: pct(0.99), max: frameMs[frameMs.length - 1] }, rounds, failures: (await g(page, 'worldStats()')).failures, errors };
   writeFileSync(`${OUT}/tour.json`, JSON.stringify(report, null, 2));
   expect(errors).toEqual([]);
   expect(report.failures).toBe(0);

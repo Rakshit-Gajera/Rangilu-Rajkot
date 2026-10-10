@@ -32,3 +32,12 @@ describe('GPS routing', () => {
     expect(r!.length).toBeLessThan(5000);
   });
 });
+
+describe.skipIf(!hasWorld)('GPS reaches every landmark', () => {
+  it('routes from the spawn to all landmark labels', () => {
+    const raw = gunzipSync(readFileSync(resolve(WORLD, 'map.json.gz')));
+    const g = new RoadGraph(JSON.parse(raw.toString('utf8')));
+    const missing = g.data.labels.filter((l) => l.kind === 'landmark' && !g.route(-1067, 473, l.x, l.n)).map((l) => l.t);
+    expect(missing).toEqual([]);
+  });
+});

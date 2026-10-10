@@ -121,6 +121,12 @@ export class Scooter {
     }
   }
 
+  /** Freeze the parked scooter while the ground under it is not loaded, so it can't fall away. */
+  setFrozen(frozen: boolean) {
+    if (this.chassis.isEnabled() === !frozen) return;
+    this.chassis.setEnabled(!frozen);
+  }
+
   teleport(x: number, y: number, z: number) {
     this.chassis.setTranslation({ x, y: y + 0.6, z }, true);
     this.chassis.setRotation(quatY(this.yaw()), true);

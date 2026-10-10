@@ -53,7 +53,7 @@ export class Player {
   speed = 0;
   visible = true;
 
-  constructor(private physics: Physics, scene: THREE.Scene, x: number, y: number, z: number) {
+  constructor(physics: Physics, scene: THREE.Scene, x: number, y: number, z: number) {
     const R = physics.R;
     const p = personMesh();
     this.object = p.root;
@@ -141,11 +141,6 @@ export class Player {
     const t = this.body.translation();
     this.body.setNextKinematicTranslation({ x: t.x + m.x, y: t.y + m.y, z: t.z + m.z });
 
-    // Safety net: fell through the world -> back onto the ground (PROMPT §9.1).
-    if (t.y < -200) {
-      const g = this.physics.groundAt(t.x, t.z);
-      this.teleport(t.x, (g ?? 50) + 1, t.z);
-    }
   }
 
   /** Render-rate visuals: interpolated position, facing, limb swing. */

@@ -71,14 +71,15 @@ export class DynamicResolution {
   sample(dt: number): number | null {
     this.acc += dt;
     this.frames++;
-    if (this.acc < 2) return null;
+    // Resizing reallocates the drawing buffers (a hitch), so decide over 5 s and move in clear steps.
+    if (this.acc < 5) return null;
     const fps = this.frames / this.acc;
     this.acc = 0;
     this.frames = 0;
     let next = this.ratio;
-    if (fps < this.targetFps * 0.85) next = Math.max(this.max * 0.55, this.ratio - 0.1);
-    else if (fps > this.targetFps * 0.97) next = Math.min(this.max, this.ratio + 0.05);
-    if (Math.abs(next - this.ratio) < 1e-3) return null;
+    if (fps < this.targetFps * 0.8) next = Math.max(this.max * 0.55, this.ratio - 0.15);
+    else if (fps > this.targetFps * 0.98) next = Math.min(this.max, this.ratio + 0.1);
+    if (Math.abs(next - this.ratio) < 0.05) return null;
     this.ratio = next;
     return next;
   }

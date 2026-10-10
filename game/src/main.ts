@@ -11,7 +11,7 @@ import { Clock, Environment, goldenHour } from './render/sky';
 import { Hud } from './ui/hud';
 import { CityMap } from './ui/map';
 import { PauseMenu } from './ui/pause';
-import { RoadGraph } from './world/roadgraph';
+import { distanceToPolyline, RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
 
 const FACTS = [
@@ -122,8 +122,37 @@ async function main() {
       hud.flash('You have arrived');
       return;
     }
+    // Re-route only when off the route (or every 15 s), so GPS costs nothing while you follow it.
+    const off = cityMap.route ? distanceToPolyline(p.x, -p.z, cityMap.route) > 40 : true;
+    if (!off && routeAge < 15) { routeAge += 1.5; return; }
+    routeAge = 0;
     const r = graph.route(p.x, -p.z, w.x, w.n);
     cityMap.setRoute(r?.points ?? null, r?.length ?? 0);
+    if (!r) routeTimer = 10;
+  }
+  let routeAge = 0;
+
+  // Edge of the world and safety net (PROMPT §7.1, §9.1): checked twice a second.
+  let guardTimer = 0;
+  let edgeNotice = 0;
+  function guard(dt: number) {
+    guardTimer -= dt;
+    edgeNotice -= dt;
+    if (guardTimer > 0 || traveling || fixedView) return;
+    guardTimer = 0.5;
+    const p = here();
+    const ground = world.terrainAt(p.x, p.z);
+    const outside = !world.isTile(p.x, p.z);
+    if (outside || (ground !== null && p.y < ground - 5)) {
+      // Fell through the world or slipped past the edge: back onto the nearest road.
+      void fastTravel(p.x, -p.z);
+      return;
+    }
+    const nearEdge = [[30, 0], [-30, 0], [0, 30], [0, -30]].some(([dx, dz]) => !world.isTile(p.x + dx, p.z + dz));
+    if (nearEdge && edgeNotice <= 0) {
+      hud.flash("You've reached the edge of Rajkot");
+      edgeNotice = 8;
+    }
   }
   let showPerf = false;
   let fixedView: { pos: THREE.Vector3; look: THREE.Vector3 } | null = null;
@@ -136,6 +165,9 @@ async function main() {
 
   let acc = 0;
   let simTime = 0;
+  const worst: Record<string, number> = { sim: 0, hud: 0, route: 0 };
+  let tMark = 0;
+  const mark = (name: string) => { const t = performance.now(); worst[name] = Math.max(worst[name] ?? 0, t - tMark); tMark = t; };
   let last = performance.now();
   const frameTimes: number[] = [];
 
@@ -143,6 +175,7 @@ async function main() {
     const dt = FIXED_STEP ? STEP : Math.min((now - last) / 1000, 0.1);
     last = now;
     const tFrame = performance.now();
+    tMark = tFrame;
 
     // --- Input-driven actions -------------------------------------------------
     if (!cityMap?.open && input.hit('Escape')) pause.toggle();
@@ -178,7 +211,9 @@ async function main() {
     if (input.hit('KeyR') && riding) scooter.resetUpright();
     if (input.hit('F3')) showPerf = !showPerf;
 
+    mark('input');
     // --- Fixed-step simulation --------------------------------------------------
+    const tSim = performance.now();
     acc += dt;
     while (acc >= STEP) {
       scooter.drive(riding ? controls : null, STEP);
@@ -189,8 +224,10 @@ async function main() {
       simTime += STEP;
       acc -= STEP;
     }
+    worst.sim = Math.max(worst.sim, performance.now() - tSim);
     clock.advance(dt);
 
+    mark('simAll');
     // --- Visuals ----------------------------------------------------------------
     const alpha = acc / STEP;
     player.render(alpha, dt);
@@ -204,33 +241,48 @@ async function main() {
         ? { minDist: 4.5, fovBoost: Math.min(Math.abs(scooter.speed) * 0.5, 12), chaseYaw: scooter.yaw() + Math.PI }
         : {});
     }
+    mark('visuals');
     env.update(clock, fixedView ? fixedView.look : focus, camera);
+    mark('env');
     {
       const v = riding ? scooter.chassis.linvel() : { x: 0, z: 0 };
       const p = fixedView ? fixedView.pos : travelTo ?? (riding ? scooter.position : player.position);
-      world.update(p.x, p.z, v.x, v.z, fixedView ? 50 : 4);
+      // The parked scooter keeps the ground under it; if that isn't loaded it is frozen in place.
+      const anchors = riding ? [] : [scooter.position];
+      world.update(p.x, p.z, v.x, v.z, fixedView ? 50 : 4, anchors);
+      if (!riding) scooter.setFrozen(!world.readyAt(scooter.position.x, scooter.position.z));
+      guard(dt);
     }
-    const res = dynres.sample(dt);
+    mark('stream');
+    const res = params.get('dynres') === '0' ? null : dynres.sample(dt);
     if (res !== null) renderer.setPixelRatio(res);
+    mark('dynres');
+    const tRender = performance.now();
     renderer.render(scene, camera);
+    const renderMs = performance.now() - tRender;
 
+    tMark = performance.now();
     // --- HUD ----------------------------------------------------------------------
     const p = riding ? scooter.position : player.position;
+    const tRoute = performance.now();
     updateRoute(dt);
+    worst.route = Math.max(worst.route, performance.now() - tRoute);
+    const tHud = performance.now();
     hud.drawMinimap(p.x, -p.z, follow.yaw, cityMap?.index ?? null, cityMap?.route ?? null, cityMap?.waypoint ?? null);
-    if (cityMap?.open) cityMap.draw();
     hud.setClock(clock.label());
     hud.setSpeed(riding ? Math.abs(scooter.speed) * 3.6 : null);
     if (!traveling) hud.setPrompt(!riding && near ? 'E — ride the scooter' : '');
     hud.updateArea(p.x, -p.z, dt);
+    worst.hud = Math.max(worst.hud, performance.now() - tHud);
     if (riding) audio.setEngine(Math.min(Math.abs(scooter.speed) / 24, 1));
-    frameTimes.push(performance.now() - tFrame);
+    mark('hudAll');
+    frameTimes.push(performance.now() - tFrame - renderMs); // our own main-thread work (rendering excluded)
     if (frameTimes.length > 120) frameTimes.shift();
     if (showPerf) {
       const info = renderer.info;
       const s = world.stats();
       const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
-      hud.setPerf(`fps ${(1 / Math.max(dt, 1e-3)).toFixed(0)}  cpu ${avg.toFixed(1)} ms\n` +
+      hud.setPerf(`fps ${(1 / Math.max(dt, 1e-3)).toFixed(0)}  game ${avg.toFixed(1)} ms  render ${renderMs.toFixed(1)} ms\n` +
         `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M\n` +
         `quality ${quality.name}  res ${dynres.ratio.toFixed(2)}  near ${s.tiles}  far ${s.farTiles}  phys ${s.colliders}\n` +
         `queue ${s.queued}  buildings ${s.buildings}  geo ${info.memory.geometries}\n` +
@@ -250,6 +302,8 @@ async function main() {
     idle: () => world.stats().queued === 0,
     heap: () => (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0,
     geometries: () => renderer.info.memory.geometries,
+    frameTimes: () => frameTimes.slice(),
+    worst: () => ({ ...world.worst, ...worst }),
     stats: () => ({ ...world.stats(), calls: renderer.info.render.calls, drawnTriangles: renderer.info.render.triangles,
       busy: world.tiles.size, frameMs: frameTimes.reduce((a, b) => a + b, 0) / Math.max(frameTimes.length, 1) }),
     setView: (pos: number[], look: number[], hour?: number) => {
