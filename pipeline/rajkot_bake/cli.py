@@ -23,7 +23,7 @@ STAGES = {
     "terrain": "terrain",
     "roadstats": "roads_raw",
     "tiles": "tiler",
-    "globals": "globals",
+    "globals": "globals",  # also run automatically by "tiles"
     "report": "report",
 }
 

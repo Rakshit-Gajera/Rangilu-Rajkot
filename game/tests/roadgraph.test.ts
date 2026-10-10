@@ -41,3 +41,10 @@ describe.skipIf(!hasWorld)('GPS reaches every landmark', () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe.skipIf(!hasWorld)('world package', () => {
+  it('manifest points at the road graph', () => {
+    const manifest = JSON.parse(readFileSync(resolve(WORLD, 'manifest.json'), 'utf8'));
+    expect(manifest.map).toBe('map.json.gz');
+  });
+});

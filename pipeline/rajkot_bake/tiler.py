@@ -331,6 +331,9 @@ def run(cfg: C.Config) -> None:
         "slice": tc.get("slice") if tc.get("only_slice") else None,
     }
     C.write_json(C.WORLD / "manifest.json", manifest)
+    # The road graph shares strings.json and is referenced from the manifest, so it is always rebuilt with the tiles.
+    from . import globals as world_globals
+    world_globals.run(cfg)
     sizes = np.array(sizes)
     print(f"  {len(sizes)} tiles in {len(packs)} packs; tile size p50 {np.median(sizes) / 1e3:.0f} kB, "
           f"max {sizes.max() / 1e3:.0f} kB, total {sizes.sum() / 1e6:.1f} MB raw, "
