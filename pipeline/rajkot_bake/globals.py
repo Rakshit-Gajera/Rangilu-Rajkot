@@ -115,6 +115,7 @@ def run(cfg: C.Config) -> None:
         "pts": pts,
         "labels": labels,
         "chowks": chowk_xy,
+        "sites": C.read_json(C.interim("landmark_sites.json")) if C.interim("landmark_sites.json").exists() else [],
         "bounds": [round(v) for v in np.asarray(bounds["playable"].bounds) - (ox, oy, ox, oy)],
         "playable": [np.round(np.asarray(r.coords) - (ox, oy)).astype(int).ravel().tolist()
                      for g in getattr(shapely.simplify(bounds["playable"], 20), "geoms", [shapely.simplify(bounds["playable"], 20)])

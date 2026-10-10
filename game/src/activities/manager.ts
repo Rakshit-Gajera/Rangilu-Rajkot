@@ -2,6 +2,7 @@ import type { Activity, ActivityContext } from './activity';
 import { BrtsDriver } from './brts';
 import { FarsanDelivery } from './delivery';
 import { Garba } from './garba';
+import { KiteFight } from './kite';
 import { RickshawRides } from './rickshaw';
 import { TimeTrial } from './timetrial';
 
@@ -9,7 +10,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 /** Activities menu (J), the running activity's panel, and quitting (X) — PROMPT §3.6, §10. */
 export class Activities {
-  readonly list: Activity[] = [new RickshawRides(), new FarsanDelivery(), new TimeTrial(), new BrtsDriver(), new Garba()];
+  readonly list: Activity[] = [new RickshawRides(), new FarsanDelivery(), new TimeTrial(), new BrtsDriver(), new Garba(), new KiteFight()];
   current: Activity | null = null;
   open = false;
   private menu: HTMLDivElement;

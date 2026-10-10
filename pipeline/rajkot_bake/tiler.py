@@ -18,6 +18,7 @@ from shapely import STRtree
 from shapely.geometry import box
 
 from . import config as C
+from . import sites
 from .chowks import KINDS as CHOWK_KINDS, SUBJECTS as CHOWK_SUBJECTS
 from .flyovers import deck_heights
 from .report import USES
@@ -148,6 +149,8 @@ def run(cfg: C.Config) -> None:
     surf_roads = roads[~roads.bridge & ~roads.tunnel]
     surf_poly = shapely.buffer(surf_roads.geometry.values, surf_roads.width.values / 2, quad_segs=4)
     surf_tree = STRtree(surf_poly)
+    # Hand-built landmark models replace the generic building at their site (sites.py).
+    _, landmark_drop = sites.compute(cfg, b, roads, oe, on)
 
     lu = gpd.read_parquet(C.interim("osm_landuse.parquet"))
     lt = lu.tags.map(json.loads)
@@ -188,8 +191,9 @@ def run(cfg: C.Config) -> None:
         hb = terrain.block(*sw)
         sections.append((b"HGHT", struct.pack("<H", N_H) + dm(hb - 100.0).tobytes()))
 
-        parts = [struct.pack("<I", len(by_tile[(i, j)]))]
-        for k in by_tile[(i, j)]:
+        keep = [k for k in by_tile[(i, j)] if k not in landmark_drop]
+        parts = [struct.pack("<I", len(keep))]
+        for k in keep:
             r = b.iloc[k]
             ring = np.asarray(r.geometry.exterior.coords)[:-1]
             base = float(terrain.sample(ring).min()) - 100.0

@@ -12,6 +12,8 @@ export interface MapData {
   playable: number[][];
   /** Every roundabout island centre [x, n] (newer maps). */
   chowks?: number[][];
+  /** Hand-built landmark model sites (newer maps). */
+  sites?: import('./landmarks').Site[];
 }
 
 export const ONEWAY = 1;

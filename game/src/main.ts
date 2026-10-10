@@ -29,6 +29,7 @@ import { Hud } from './ui/hud';
 import { CityMap } from './ui/map';
 import { Life } from './actors/life';
 import { Signals } from './world/signals';
+import { LandmarkModels } from './world/landmarks';
 import { PauseMenu } from './ui/pause';
 import { distanceToPolyline, RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
@@ -230,6 +231,7 @@ async function main() {
     ...graph.data.labels.filter((l) => l.kind === 'chowk'), ...(graph.data.chowks ?? []).map(([x, n]) => ({ x, n }))]) : null;
   if (life) life.signals = signals;
   if (life && home) life.denseZones.push({ x: home.x, n: home.n, r: 800 });
+  const landmarkModels = new LandmarkModels(graph?.data.sites ?? [], scene, physics, shadowSize > 0);
   const cityMap = graph ? new CityMap(graph, {
     player: () => { const p = here(); return { x: p.x, n: -p.z, heading: -follow.yaw }; },
     onWaypoint: () => { routeTimer = 0; },
@@ -322,7 +324,7 @@ async function main() {
   const activities = activityCtx ? new Activities(activityCtx, (a) => {
     const b = save.records[a.id];
     if (b === undefined) return '';
-    return a.id === 'timetrial' ? `${Math.floor(-b / 60)}:${String(Math.floor(-b % 60)).padStart(2, '0')} lap` : a.id === 'garba' ? `${b} points` : `₹${b} in one go`;
+    return a.id === 'timetrial' ? `${Math.floor(-b / 60)}:${String(Math.floor(-b % 60)).padStart(2, '0')} lap` : a.id === 'garba' ? `${b} points` : a.id === 'kite' ? `${b} kites cut` : `₹${b} in one go`;
   }) : null;
 
   // Edge of the world and safety net (PROMPT §7.1, §9.1): checked twice a second.
@@ -629,6 +631,10 @@ async function main() {
     lifeMs = lifeMs * 0.95 + (performance.now() - tLife) * 0.05;
     keepAboveGround();
     if (signals) { const h = here(); signals.update(dt, h.x, -h.z, (x, n) => world.terrainAt(x, -n)); }
+    {
+      const c = freeCam || fixedView ? camera.position : here();
+      landmarkModels.update(dt, c.x, -c.z, (x, n) => world.terrainAt(x, -n));
+    }
     if (!traveling) {
       const h = here();
       discovery.update(h.x, -h.z, dt);
@@ -798,6 +804,7 @@ async function main() {
     teleportPlayer: (x: number, y: number, z: number) => player.teleport(x, y, z),
     spawnVehicle: (kind: VehicleKind, enter = true) => { spawnVehicle(kind, enter); },
     sandbox: sandboxHooks,
+    sites: () => graph?.data.sites ?? [],
     money: () => save.money,
     discovered: () => discovery.discovered,
     startActivity: (id: string) => { const a = activities?.list.find((q) => q.id === id); return a ? (a.canStart(activityCtx!) ?? activities!.start(a).then(() => 'started')) : 'none'; },
