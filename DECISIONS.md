@@ -74,3 +74,20 @@ Format: date · decision · why · alternatives considered.
 - **Facade shader uses `flat` varyings and a quantised seed**; per-window hashes amplified interpolation error into speckle.
 - **Automated tests use SwiftShader** (`--use-angle=swiftshader`): headless D3D11 lost the WebGL context. A `?fixedstep=1` mode advances exactly one physics step per frame so tests measure simulated time.
 - **Placeholder character and scooter are procedural** (no external assets yet); CC0 rigs come in P5.
+
+## 2026-10-10 · P1 gate result and P2 choices
+- **P1 gate:** Rakshit did *not* recognise the streets; frame rate reported fine. Recognition is P3's job (trees,
+  footpaths, sign text, landmarks, street furniture), so P2 went ahead as he asked. The recognition test (§1.3)
+  stays the P3 gate.
+- **Tile format v2:** road surfaces/ground cover as polygons, triangulated and grid-split in workers; packs gzipped
+  and inflated with `DecompressionStream`. City = 11.6 MB (target 30–50 MB, cap 150 MB). Largest pack 0.46 MB.
+- **LOD scheme:** near tiles (full detail; props and lane markings only within `props` m) and far tiles (one merged
+  vertex-coloured mesh: 20 m terrain, road ribbons, water, building prisms ≥ 30 m², faint night glow). Far meshes
+  stay loaded under near tiles so eviction never leaves holes. Distances per quality preset (`app/quality.ts`).
+- **Colliders only within ~300 m**; terrain is a Rapier heightfield (verified against `heightAt` in tests).
+- **Physics WASM as a separate file** (`@dimforge/rapier3d` + `vite-plugin-wasm`): engine download 1.40 MB gzip
+  (was 1.82 MB with the base64-inlined compat build). Unit tests still use the compat build under Node.
+- **One road graph for map, minimap and GPS** (`world/map.json.gz`, 1.0 MB): A* with one-way streets and a mild
+  preference for bigger roads; fast travel snaps to the nearest ground-level road node (never a flyover deck).
+- **Quality preset auto-pick** from renderer string / cores / memory / mobile, overridable in the pause menu
+  (saved in localStorage, works without it) or with `?quality=`. Dynamic resolution holds the target frame rate.

@@ -1,4 +1,4 @@
-# `.rtile` format, version 1
+# `.rtile` format, version 2
 
 One 500 × 500 m tile of world facts. Little-endian. Written by `pipeline/rajkot_bake/tiler.py`,
 read by `game/src/world/rtile.ts`. Change both together and bump the version.
@@ -12,7 +12,7 @@ read by `game/src/world/rtile.ts`. Change both together and bump the version.
 | Offset | Type | Field |
 |---|---|---|
 | 0 | char[4] | magic `RJKT` |
-| 4 | u16 | version (1) |
+| 4 | u16 | version (2) |
 | 6 | u16 | flags (0) |
 | 8 | i16 | tile i (relative to origin tile) |
 | 10 | i16 | tile j |
@@ -64,21 +64,31 @@ Tiles share their edge rows/columns.
 
 Lines are clipped to the tile (+10 m overlap). Bridges are not part of `RDSF`.
 
-### `RDSF` — road surface meshes
-`u8 surface count`, then per surface: `u8 surface, u32 vertex count V, u32 index count I`,
-`V × (i16 x, i16 n)`, `I × u16` triangle indices. Junctions are already merged (union of all
-road footprints, inner corners rounded) and split on the 10 m terrain grid so every vertex can
-take its height from `HGHT`.
+### `RDSF` — road surfaces (polygons)
+`u8 entry count`, then per entry: `u8 surface` (0 asphalt, 1 concrete, 2 paving, 3 dirt), `u16 polygon count`;
+per polygon `u8 ring count`; per ring `u16 n`, `n × (i16 x, i16 n)` dm. Ring 0 is the outline, the rest are holes.
+Junctions are already merged (union of all road footprints, inner corners rounded). The game triangulates
+(earcut) and cuts every triangle on the 10 m terrain grid in a worker so each piece drapes exactly on the ground.
 
-### `AREA` — ground cover meshes
-Same layout as `RDSF`, with an area class instead of a surface: 0 grass, 1 water, 2 sand, 3 pitch/dirt.
-Water vertices carry no height; the water level for the tile is `i16` dm stored after each water
-class header (`u8 class, i16 level, u32 V, u32 I`), other classes have no level field.
+### `AREA` — ground cover (polygons)
+Same layout as `RDSF` with an area class instead of a surface: 0 grass, 1 water, 2 sand (dry riverbed).
+Water entries carry an `i16` water level (dm) right after the class byte. Water is flat and is not grid-split.
 
 ### `LMRK` — landmarks
 `u16 count`, then per landmark: `u32 name (strings index), u8 confidence (0 low, 1 medium, 2 high), i16 x, i16 n`.
 
-## Packs (`.rpk`) and manifest
-A region pack is the plain concatenation of up to 4 × 4 tiles. `world/manifest.json` maps
-`"i,j"` → `[packFile, offset, length]` and carries the world frame (origin, tile size, y offset)
-and the `strings.json` name.
+## Packs (`.rpk.gz`) and manifest
+A region pack is the concatenation of up to 4 × 4 tiles, gzip-compressed. `world/manifest.json` maps
+`"i,j"` → `[packFile, offset, length]` (offsets into the *decompressed* pack; the game inflates packs
+with `DecompressionStream`) and carries the world frame (origin, tile size, y offset), the `strings.json`
+name and the `map` file.
+
+## `map.json.gz` — city road graph, map layer and labels
+Written by `pipeline/rajkot_bake/globals.py`: graph nodes (metres from the origin), edges (endpoints, rank,
+flags bit0 one-way / bit1 bridge, name, length in dm, simplified polyline) and labels (neighbourhoods,
+landmarks). The full map, the minimap and GPS routing all use it.
+
+## Version history
+- v2 (P2): road surfaces and ground cover stored as polygons instead of pre-triangulated meshes (−60 % size),
+  packs gzipped. Whole city: 1,308 tiles, 11.6 MB.
+- v1 (P1): first version, vertical slice only.

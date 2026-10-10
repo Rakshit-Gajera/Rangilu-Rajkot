@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-10-10 · Session 2 — P2 whole city
+**Done**
+- P1 gate: Rakshit couldn't recognise the streets (→ P3), frame rate fine. P2 started on his request.
+- Whole city baked: 1,308 tiles (tile format v2: polygons + gzip) = 11.6 MB, largest pack 0.46 MB. All QA checks pass
+  except the waived landmark check (5 positions still unknown, Trimandir ambiguous).
+- Streaming: predicted-position priority, eviction with hysteresis, far LOD to the horizon, colliders only nearby
+  (heightfield terrain), worker crash recovery, pack cache. Boot to playable ≈ 4 s locally.
+- Full map (M): pan/zoom, neighbourhoods and landmarks, click for a waypoint, GPS route (one-ways respected) on the
+  map and minimap, F to fast travel, arrival message. Race Course → Rajkot Junction routes on real roads.
+- Quality presets Low/Medium/High/Ultra (auto-picked, changeable in the Esc menu), dynamic resolution.
+- Engine download 1.40 MB gzip (physics WASM separate).
+- Tests: 36 vitest, 19 pytest, 4 Playwright (boot + 10 viewpoints, walk/ride, map/GPS/fast travel,
+  17 km cross-city tour with a leak check: second round identical to the first, heap ≈ 60 MB).
+
+**Next**
+- P2 gate: Rakshit rides across the city (e.g. Race Course → Darshan University with M + waypoint) and reports hitches.
+- Then P3: make it look like Rajkot.
+
+**Known issues**
+- The city still looks generic (no trees, footpaths, street lights, sign text, landmark models) — P3.
+- Far tiles have no facade detail; at night the far city is only a faint glow.
+- Only 36 map labels (OSM has few neighbourhood names here); road names appear on the area banner.
+- No IndexedDB pack cache yet (the browser HTTP cache covers repeat visits).
+- Character and scooter are placeholders; lane markings double up at tile seams.
+
 ## 2026-10-09 · Session 1 (cont.) — P1 vertical slice
 **Done**
 - P0 gate answers applied: Darshan University placed at its real location with a Morbi-highway corridor

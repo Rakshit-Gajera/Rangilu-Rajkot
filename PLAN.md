@@ -1,31 +1,21 @@
 # Plan
 
-Current phase: **P1 — Vertical slice** (PROMPT.md §13). Gate: Rakshit recognises his streets; 60 fps on his laptop.
+Current phase: **P2 — Whole city** (PROMPT.md §13). Gate: cross-city drive without hitches (Rakshit).
 
-P0 (data recon) is done. Leftover P0 items (landmark pins still needed: Dharmendra Rd, Lakhajiraj Rd,
-Sadar Bazaar, Connaught Hall, Ramvan, Trimandir) don't block P1.
+## P2 tasks
+- [x] 2.1 Bake every tile (1,308) — `.rtile` v2 polygons, gzipped region packs (11.6 MB)
+- [x] 2.2 Streaming manager: priority by predicted position, worker pool with crash recovery, pack LRU, eviction with hysteresis
+- [x] 2.3 LOD: near (LOD0/1 props by distance) + far merged meshes (LOD2) to 3 km on High
+- [x] 2.4 Colliders only near the player; heightfield terrain
+- [x] 2.5 City road graph + full map (M) + GPS route on map and minimap + fast travel (F)
+- [x] 2.6 Quality presets (auto) + pause menu + dynamic resolution
+- [x] 2.7 Engine bundle under 1.5 MB gzip (physics WASM split out)
+- [x] 2.8 Cross-city tour test: 17 km route + repeated city tour, no errors, no growth in memory
+- [ ] 2.9 Rakshit: cross-city drive on his laptop (gate)
 
-## Slice
-About 3 × 2 km around Race Course, Jubilee Garden and the old-city bazaars:
-x ∈ [−2000, +1000] m, y(north) ∈ [−500, +1500] m from the Trikon Baug origin = 24 tiles.
-
-## P1 tasks
-Bake (Python)
-- [x] 1.1 Terrain: de-bumped Copernicus DEM → 10 m grid per tile, roads flattened, building base heights
-- [x] 1.2 Roads: widths, surface polygons per tile (union handles junctions), centrelines with 3D profile, bridges/flyovers
-- [x] 1.3 Parks/water/land-use polygons per tile
-- [x] 1.4 Tiler + `.rtile` encoder (v1: HEIGHT, BLDG, ROAD, AREA sections) + manifest; slice packs
-
-Game (TypeScript, `game/`)
-- [x] 1.5 Scaffold: Vite 8 + TS 7 + three r186 + Rapier 0.21, vitest, fixed-step loop
-- [x] 1.6 Tile decode in a worker; generators: terrain, roads, buildings (extrude, roofs, parapets)
-- [x] 1.7 Facade shader (windows/shutters/plaster by zone Z1–Z4, night windows)
-- [x] 1.8 Sky, sun and moon (suncalc, IST), shadows, fog, day/night cycle
-- [x] 1.9 Player on foot: Rapier character controller, third-person camera, colliders
-- [x] 1.10 Scooter: ray-cast vehicle, lean, enter/exit, horn
-- [x] 1.11 HUD: minimap, clock, speed, area name
-- [x] 1.12 Playwright: boot + viewpoint screenshots + perf numbers
-- [x] 1.13 Reviewer pass → fixes (gate: waiting for Rakshit)
+## Next phase
+P3 — make it look like Rajkot (recognition gate ≥ 8/10): trees, footpaths and kerbs, street lights and poles,
+bilingual signboards with text, roof variety, flyovers' look, lakes and dams, the 20 landmarks.
 
 ## Done
-P0 — data recon (see PROGRESS.md and DATA_REPORT.md).
+- P0 — data recon. P1 — vertical slice (gate: streets not yet recognisable → P3).

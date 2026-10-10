@@ -1,6 +1,6 @@
 # Data report — Rajkot bake
 
-Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
+Generated 2026-10-10 by `python -m rajkot_bake report`. Phase 0 (data recon).
 
 ## QA checks
 
@@ -9,7 +9,7 @@ Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
 | No invalid geometry | PASS | 0 invalid |
 | Overlapping buildings < 0.5 % | PASS | 0.00% (0) overlap > 1 m² |
 | Largest road component ≥ 98 % of drivable length | PASS | 99.5% |
-| Every tile ≤ 1 MB | — | n/a until tiles are encoded (P1/P2) |
+| Every tile ≤ 1 MB | PASS | largest tile 56 kB of 1308 tiles |
 | Every landmark located (unambiguous, inside the playable area) | WAIVED (P0: six landmarks need positions from Rakshit) | missing/ambiguous: connaught_hall, dharmendra_road, lakhajiraj_road, sadar_bazaar, ramvan, trimandir; outside playable: none |
 
 ## World frame
@@ -38,15 +38,15 @@ Generated 2026-10-09 by `python -m rajkot_bake report`. Phase 0 (data recon).
 | Floors | Buildings |
 |---|---|
 | 1 | 47,145 |
-| 2 | 50,477 |
-| 3 | 33,985 |
-| 4 | 12,868 |
-| 5 | 4,221 |
-| 6 | 1,626 |
-| 7 | 736 |
-| 8 | 351 |
-| 9 | 183 |
-| 10 | 90 |
+| 2 | 50,738 |
+| 3 | 34,013 |
+| 4 | 13,150 |
+| 5 | 3,863 |
+| 6 | 1,501 |
+| 7 | 683 |
+| 8 | 332 |
+| 9 | 169 |
+| 10 | 88 |
 | 11 | 49 |
 | 12 | 22 |
 | 13 | 14 |

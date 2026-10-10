@@ -139,6 +139,10 @@ def run(cfg: C.Config, include_private: bool = False) -> None:
     ov_area = shapely.area(shapely.intersection(b.geometry.values[i[pairs]], b.geometry.values[j[pairs]]))
     overlapping = len(set(i[pairs][ov_area > 1.0]) | set(j[pairs][ov_area > 1.0]))
     overlap_share = overlapping / n
+    mpath = C.WORLD / "manifest.json"
+    tiles_index = C.read_json(mpath)["tiles"] if mpath.exists() else {}
+    max_tile = max((v[2] for v in tiles_index.values()), default=0)
+    n_tiles = len(tiles_index)
     missing_lm = lm.loc[lm.status.isin(["missing", "ambiguous"]), "id"].tolist()
     outside_lm = lm.loc[(lm.status != "missing") & ~lm.in_playable, "id"].tolist()
     # (key, label, ok, detail); ok None = not applicable yet.
@@ -148,7 +152,8 @@ def run(cfg: C.Config, include_private: bool = False) -> None:
          f"{overlap_share:.2%} ({overlapping}) overlap > 1 m²"),
         ("road_connectivity", "Largest road component ≥ 98 % of drivable length",
          rs["largest_component_share"] >= 0.98, f"{rs['largest_component_share']:.1%}"),
-        ("tile_size", "Every tile ≤ 1 MB", None, "n/a until tiles are encoded (P1/P2)"),
+        ("tile_size", "Every tile ≤ 1 MB", (max_tile <= 1_000_000) if max_tile else None,
+         f"largest tile {max_tile / 1e3:.0f} kB of {n_tiles} tiles" if max_tile else "tiles not encoded yet"),
         ("landmarks_located", "Every landmark located (unambiguous, inside the playable area)",
          not missing_lm and not outside_lm,
          f"missing/ambiguous: {', '.join(missing_lm) or 'none'}; outside playable: {', '.join(outside_lm) or 'none'}"),
