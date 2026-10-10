@@ -24,7 +24,7 @@ P2 gate passed (Rakshit, 2026-10-10).
 - [x] 3.5 Street lights, electric poles with wires, night light pools
 - [x] 3.6 Bilingual shop signboards (English + Gujarati)
 - [x] 3.7 Heritage (Z2) facade: arches, pilasters, cornices
-- [ ] 3.8 Footpaths, kerbs and medians on main roads
+- [x] 3.8 Footpaths with black-and-yellow kerbs on main roads (medians still to do)
 - [ ] 3.9 Landmark models (Race Course ground, Watson Museum, Rajkot Junction, Rajkumar College, …) — need reference photos / Rakshit
 - [ ] 3.10 Lakes and dams (Aji-1, Nyari-1, Lalpari): embankments, water look
 - [ ] 3.11 Roof variety (Mangalore tiles in Z1/Z7, solar panels, dish antennas)

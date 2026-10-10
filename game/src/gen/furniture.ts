@@ -56,11 +56,59 @@ export function furnitureMeshes(tile: Tile): FurnitureMeshes {
   for (const r of tile.roads) {
     if (r.bridge || r.tunnel) continue;
     const phase = hash01(r.points.length * 7919 + Math.round(r.points[0] * 10)) * 10;
+    if (r.rank >= 6) footpaths(r);
     if (r.rank >= 5) streetLights(r, phase);
     else if (r.rank >= 3 && r.surface !== 3) electricPoles(r, phase);
   }
   const c = col.build();
   return { solid: solid.build(), lamps: lamps.build(), pools: pools.build(), collider: { position: c.position, index: c.index } };
+
+  /** Raised paver footpaths on both sides of main roads, edged by a black-and-yellow painted kerb. */
+  function footpaths(r: RoadLine) {
+    const p = r.points, n = p.length / 3;
+    const W = 2.2, H = 0.15;
+    for (const side of [1, -1]) {
+      let band = 0;
+      for (let k = 0; k < n - 1; k++) {
+        const x0 = p[3 * k], n0 = p[3 * k + 1], x1 = p[3 * k + 3], n1 = p[3 * k + 4];
+        const len = Math.hypot(x1 - x0, n1 - n0);
+        if (len < 0.5) continue;
+        const rx = ((n1 - n0) / len) * side, rn = (-(x1 - x0) / len) * side; // towards this side
+        const inner = r.width / 2 + 0.05, outer = inner + W;
+        const mx = (x0 + x1) / 2 + rx * (inner + W / 2), mn = (n0 + n1) / 2 + rn * (inner + W / 2);
+        if (!inTile(mx, mn) || nearIsland(mx, mn)) continue;
+        const pts = [[x0, n0, inner], [x1, n1, inner], [x1, n1, outer], [x0, n0, outer]].map(([x, nn, o]) => {
+          const px = x + rx * o, pn = nn + rn * o;
+          return [px, heightAt(tile, px, pn) + H, -pn] as V3;
+        });
+        const paver = [0.62, 0.52, 0.45];
+        // Top (counter-clockwise from above depends on side).
+        const top = side > 0 ? [pts[0], pts[3], pts[2], pts[1]] : [pts[0], pts[1], pts[2], pts[3]];
+        quadUp(top, paver);
+        // Kerb face towards the road, painted in ~1 m bands.
+        const pieces = Math.max(1, Math.round(len));
+        for (let q = 0; q < pieces; q++) {
+          const a = q / pieces, b2 = (q + 1) / pieces;
+          const ax = x0 + (x1 - x0) * a + rx * inner, an = n0 + (n1 - n0) * a + rn * inner;
+          const bx = x0 + (x1 - x0) * b2 + rx * inner, bn = n0 + (n1 - n0) * b2 + rn * inner;
+          const ya = heightAt(tile, ax, an), yb = heightAt(tile, bx, bn);
+          const colr = band++ % 2 ? [0.95, 0.76, 0.1] : [0.1, 0.1, 0.1];
+          const face: V3[] = [[ax, ya - 0.05, -an], [bx, yb - 0.05, -bn], [bx, yb + H, -bn], [ax, ya + H, -an]];
+          // Face normal points away from this side, towards the carriageway.
+          const nx = -rx, nz = rn;
+          const ids = face.map((v) => solid.vertex(v[0], v[1], v[2], nx, 0, nz, 0, 0, { color: colr }));
+          const g = (face[1][0] - face[0][0]) * nz - (face[1][2] - face[0][2]) * nx; // orientation test
+          if (g > 0) solid.quad(ids[0], ids[1], ids[2], ids[3]); else solid.quad(ids[1], ids[0], ids[3], ids[2]);
+        }
+      }
+    }
+  }
+
+  function quadUp(v: V3[], color: number[]) {
+    const ids = v.map((q) => solid.vertex(q[0], q[1], q[2], 0, 1, 0, 0, 0, { color }));
+    const cross = (v[1][2] - v[0][2]) * (v[2][0] - v[0][0]) - (v[1][0] - v[0][0]) * (v[2][2] - v[0][2]);
+    if (cross > 0) solid.quad(ids[0], ids[1], ids[2], ids[3]); else solid.quad(ids[0], ids[3], ids[2], ids[1]);
+  }
 
   function poleCollider(x: number, y: number, z: number, h: number) {
     box(col, x, y, z, 0.35, h, 0.35, [0, 0, 0]);
