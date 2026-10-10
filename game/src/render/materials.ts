@@ -230,12 +230,15 @@ varying float vSurface; varying vec2 vWuv; uniform float uWet;
 ${GLSL_COMMON}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   int s = int(vSurface + 0.5);
-  vec3 c = s == 0 ? vec3(0.40, 0.39, 0.38) : (s == 1 ? vec3(0.66, 0.65, 0.62) : (s == 2 ? vec3(0.50, 0.34, 0.28) : vec3(0.52, 0.42, 0.30)));
+  vec3 c = s == 0 ? vec3(0.50, 0.48, 0.45) : (s == 1 ? vec3(0.66, 0.65, 0.62) : (s == 2 ? vec3(0.50, 0.34, 0.28) : vec3(0.52, 0.42, 0.30)));
   float n1 = fNoise(vWuv * 0.35), n2 = fNoise(vWuv * 3.0), patchy = smoothstep(0.62, 0.7, fNoise(vWuv * 0.08 + 7.0));
   c *= 0.85 + 0.2 * n1 + 0.08 * n2;
   if (s == 0) c = mix(c, vec3(0.30, 0.29, 0.28), patchy * 0.8); // patch repairs
   if (s == 1) c *= 1.0 - 0.12 * step(0.94, fract(vWuv.x * 0.25)) - 0.12 * step(0.94, fract(vWuv.y * 0.25)); // RCC joints
   if (s == 2) c *= 0.85 + 0.15 * step(0.12, fract(vWuv.x * 4.0)) * step(0.12, fract(vWuv.y * 2.0)); // paver blocks
+  // Dust at the road edges and between the wheel tracks; darker, oil-stained wheel paths.
+  float track = fNoise(vWuv * vec2(0.6, 0.05) + 11.0);
+  c *= 0.94 + 0.1 * track;
   diffuseColor.rgb = pow(c, vec3(2.2));
   // Wet: darker, with puddles in the low patches.
   float puddle = smoothstep(0.55, 0.7, fNoise(vWuv * 0.21 + 3.0)) * uWet;
@@ -245,6 +248,41 @@ ${GLSL_COMMON}`)
   };
   m.customProgramCacheKey = () => 'road-v2';
   m.envMapIntensity = 0.45; // dusty asphalt: less blue sky light, so roads stay grey in the shade
+  return m;
+}
+
+/**
+ * Bare ground: the baked soil colour broken up by large dry/damp patches, sparse dry-grass tufts and fine grit,
+ * all in world space (no texture), fading to the plain colour in the distance; greener in the monsoon.
+ */
+export function terrainMaterial(): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uWet = worldUniforms.uWet;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vGround;`)
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vGround; uniform float uWet;
+${GLSL_COMMON}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  {
+    vec2 p = vGround.xz;
+    float far = smoothstep(60.0, 260.0, length(vGround - cameraPosition));
+    float big = fNoise(p * 0.035) * 0.6 + fNoise(p * 0.11) * 0.4;   // patches of darker/lighter earth
+    float tuft = smoothstep(0.62, 0.8, fNoise(p * 0.7 + 3.1));        // clumps of dry grass
+    float grit = fNoise(p * 4.5);                                     // fine grit
+    vec3 c = diffuseColor.rgb * (0.82 + 0.3 * big);
+    vec3 grass = mix(vec3(0.33, 0.30, 0.16), vec3(0.16, 0.27, 0.08), uWet); // dry straw, monsoon green
+    c = mix(c, grass * (0.85 + 0.3 * big), tuft * 0.55 * (1.0 - far * 0.6));
+    c *= mix(0.92 + 0.16 * grit, 1.0, far);
+    diffuseColor.rgb = c;
+  }`);
+  };
+  m.customProgramCacheKey = () => 'terrain-v1';
   return m;
 }
 

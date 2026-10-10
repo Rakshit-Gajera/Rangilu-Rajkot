@@ -4,7 +4,7 @@ import type { GeoBuf } from '../gen/geobuf';
 import type { TileBuild } from '../gen/tile';
 import type { Physics } from '../physics/physics';
 import {
-  facadeMaterial, farMaterial, lampMaterial, lightPoolMaterial, grassMaterial, roadMaterial, sandMaterial, vertexColorMaterial, waterMaterial,
+  facadeMaterial, farMaterial, lampMaterial, lightPoolMaterial, grassMaterial, roadMaterial, sandMaterial, terrainMaterial, vertexColorMaterial, waterMaterial,
 } from '../render/materials';
 import { N_SPECIES, GULMOHAR, treeModel } from '../gen/trees';
 import { TreeLayer } from './treelayer';
@@ -85,7 +85,7 @@ export class World {
     facade: facadeMaterial(),
     roof: vertexColorMaterial({ roughness: 0.95 }),
     props: vertexColorMaterial({ roughness: 0.7 }),
-    terrain: vertexColorMaterial({ roughness: 1 }),
+    terrain: terrainMaterial(),
     road: roadMaterial(),
     marking: vertexColorMaterial({ roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }),
     bridge: vertexColorMaterial({ roughness: 0.85 }),
@@ -434,7 +434,7 @@ export class World {
       for (const m of t.detail) if (!m.userData.pending) m.visible = d <= this.config.props || (zone && d <= Math.max(this.config.props, 900));
     }
     const trees = this.config.trees;
-    const hiR = this.inZone(this.focus.x, this.focus.n) ? 220 : Math.min(160, Math.max(70, this.config.props * 0.45));
+    const hiR = this.inZone(this.focus.x, this.focus.n) ? 160 : Math.min(110, Math.max(60, this.config.props * 0.35));
     this.treeLayer.update(this.treeSources(), this.focus.x, -this.focus.n, hiR, trees, this.viewDir.x, this.viewDir.z);
   }
 

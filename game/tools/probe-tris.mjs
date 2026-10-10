@@ -2,7 +2,7 @@ import { chromium } from '@playwright/test';
 const q = process.argv[2] ?? 'high';
 const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await b.newPage({ viewport: { width: 640, height: 360 } });
-await p.goto(`http://localhost:5173/?quality=${q}&dynres=0&date=2026-10-09&hour=10`);
+await p.goto(`http://localhost:5173/?quality=${q}&dynres=0&date=2026-10-09&hour=10&save=0&title=0`);
 await p.waitForFunction(() => window.__game?.ready, null, { timeout: 180000 });
 await p.waitForFunction(() => window.__game.idle(), null, { timeout: 180000 });
 await p.waitForTimeout(3000);

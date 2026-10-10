@@ -37,7 +37,19 @@ export function treeModel(species: number, bloom = false, lo = false): GeoBuf {
   const r = rng(1000 + species);
   const leaf = (base: number[], v = 0.12) => base.map((c) => c * (1 - v / 2 + r() * v));
   // Low-poly version for distant trees (no shadows): fewer sides on everything.
-  const blob = (c: V3, rad: number, col: number[], sy = 0.75) => sphere(b, c, rad, leaf(col), sy, lo ? 5 : 9);
+  // Leaf clump: far trees get one simple ball; near trees a core with smaller clumps bulging from its upper
+  // half, each a slightly different green, so the canopy reads as foliage rather than a ball.
+  const blob = (c: V3, rad: number, col: number[], sy = 0.75) => {
+    if (lo) { sphere(b, c, rad, leaf(col), sy, 5); return; }
+    sphere(b, c, rad * 0.85, leaf(col, 0.1), sy, 8);
+    const n = sy < 0.6 ? 3 : 4; // wide, flat canopies (banyan) have many clumps already
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + r() * 1.2, up = 0.15 + r() * 0.55;
+      const d = rad * 0.62;
+      sphere(b, [c[0] + Math.cos(a) * d * Math.cos(up), c[1] + Math.sin(up) * d * sy, c[2] + Math.sin(a) * d * Math.cos(up)],
+        rad * (0.38 + r() * 0.14), leaf(col.map((x) => x * (0.9 + r() * 0.25)), 0.16), sy * 1.1, 6);
+    }
+  };
   const seg = (p0: V3, p1: V3, r0: number, r1: number, col: number[], sides: number, caps = true) =>
     segment(b, p0, p1, r0, r1, col, lo ? Math.max(3, sides - 3) : sides, caps);
   switch (SPECIES[species]) {
