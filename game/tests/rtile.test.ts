@@ -80,3 +80,18 @@ describe('polygon triangulation on the terrain grid', async () => {
     }
   });
 });
+
+describe.skipIf(!hasWorld)('tile section table', () => {
+  it('has each section exactly once in every tile', () => {
+    const { manifest, tile: load } = openWorld();
+    for (const key of Object.keys(manifest.tiles).slice(0, 200)) {
+      const [buf, off, len] = load(key);
+      const dv = new DataView(buf, off, len);
+      const tags: string[] = [];
+      for (let s = 0; s < dv.getUint16(12, true); s++) {
+        tags.push(String.fromCharCode(...[0, 1, 2, 3].map((q) => dv.getUint8(16 + s * 12 + q))));
+      }
+      expect(new Set(tags).size, `${key}: ${tags.join(',')}`).toBe(tags.length);
+    }
+  });
+});

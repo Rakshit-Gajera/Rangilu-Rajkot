@@ -170,6 +170,12 @@ def run(cfg: C.Config) -> None:
     chowks = gpd.read_parquet(C.interim("chowks.parquet"))
     island_geoms = chowks.geometry.values[chowks.island.values]
     island_tree = STRtree(island_geoms)
+    trees = gpd.read_parquet(C.interim("trees.parquet"))
+    txy = shapely.get_coordinates(trees.geometry.values)
+    t_tile = (np.floor((txy[:, 0] - oe) / ts).astype(int), np.floor((txy[:, 1] - on) / ts).astype(int))
+    trees_by_tile = defaultdict(list)
+    for k, key in enumerate(zip(*t_tile)):
+        trees_by_tile[key].append(k)
     chowk_cent = [g.centroid for g in chowks.geometry.values]
 
     packs: dict[tuple[int, int], list[tuple[int, int, bytes]]] = defaultdict(list)
@@ -276,14 +282,23 @@ def run(cfg: C.Config) -> None:
                                      int(dm(c.y - sw[1])), int(dm(ground)), len(ring)))
             parts.append(dm(ring - sw).tobytes())
         sections.append((b"CHWK", b"".join(parts)))
+        tk = np.array(trees_by_tile[(i, j)], dtype=int)
+        tq = np.zeros(len(tk), dtype=[("x", "<i2"), ("n", "<i2"), ("sp", "u1"), ("sc", "u1")])
+        if len(tk):
+            tq["x"] = dm(txy[tk, 0] - sw[0])
+            tq["n"] = dm(txy[tk, 1] - sw[1])
+            tq["sp"] = trees["species"].values[tk]
+            tq["sc"] = np.clip(np.round(trees["scale"].values[tk] * 100), 0, 255)
+        sections.append((b"TREE", struct.pack("<I", len(tk)) + tq.tobytes()))
         # Named chowks also count as landmarks for the on-screen place name.
-        lmrk = sections[-2]
+        li = next(k for k, (tag, _) in enumerate(sections) if tag == b"LMRK")
+        lmrk = sections[li]
         extra = [(ck_name, chowk_cent[k]) for k in cks if isinstance(ck_name := chowks["name"].values[k], str)]
         if extra:
             count = struct.unpack_from("<H", lmrk[1])[0] + len(extra)
             body = lmrk[1][2:] + b"".join(struct.pack("<IBhh", strings.get(nm), 1, int(dm(c.x - sw[0])),
                                                       int(dm(c.y - sw[1]))) for nm, c in extra)
-            sections[-2] = (b"LMRK", struct.pack("<H", count) + body)
+            sections[li] = (b"LMRK", struct.pack("<H", count) + body)
 
         data = _encode(int(i), int(j), sections)
         sizes.append(len(data))

@@ -12,10 +12,10 @@ export interface Quality {
 
 /** Presets (PROMPT §9.6). Low targets a mid-range phone, High a mid laptop at 1080p. */
 export const PRESETS: Record<QualityName, Quality> = {
-  low: { name: 'low', stream: { near: 450, far: 1200, props: 150, colliders: 300 }, shadowSize: 0, maxPixelRatio: 1, targetFps: 30 },
-  medium: { name: 'medium', stream: { near: 750, far: 2000, props: 250, colliders: 300 }, shadowSize: 1024, maxPixelRatio: 1, targetFps: 60 },
-  high: { name: 'high', stream: { near: 1100, far: 3000, props: 300, colliders: 300 }, shadowSize: 2048, maxPixelRatio: 1.5, targetFps: 60 },
-  ultra: { name: 'ultra', stream: { near: 1500, far: 4000, props: 450, colliders: 350 }, shadowSize: 4096, maxPixelRatio: 2, targetFps: 60 },
+  low: { name: 'low', stream: { near: 450, far: 1200, props: 150, trees: 300, colliders: 300 }, shadowSize: 0, maxPixelRatio: 1, targetFps: 30 },
+  medium: { name: 'medium', stream: { near: 750, far: 2000, props: 250, trees: 500, colliders: 300 }, shadowSize: 1024, maxPixelRatio: 1, targetFps: 60 },
+  high: { name: 'high', stream: { near: 1100, far: 3000, props: 300, trees: 700, colliders: 300 }, shadowSize: 2048, maxPixelRatio: 1.5, targetFps: 60 },
+  ultra: { name: 'ultra', stream: { near: 1500, far: 4000, props: 450, trees: 1100, colliders: 350 }, shadowSize: 4096, maxPixelRatio: 2, targetFps: 60 },
 };
 
 function stored(): QualityName | null {

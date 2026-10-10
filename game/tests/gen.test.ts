@@ -90,3 +90,13 @@ describe.skipIf(!hasWorld)('chowk generator', async () => {
     });
   }
 });
+
+describe('tree models', async () => {
+  const { treeModel, N_SPECIES } = await import('../src/gen/trees');
+  it.each(Array.from({ length: N_SPECIES }, (_, k) => k))('species %i is a small, finite, outward-facing model', (k) => {
+    const g = treeModel(k);
+    expect(finite(g)).toBe(true);
+    expect(g.index.length / 3).toBeLessThan(1500);
+    expect(windingAgreement(g)).toBeGreaterThan(0.97);
+  });
+});

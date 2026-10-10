@@ -19,6 +19,7 @@ STAGES = {
     "landmarks": "landmarks",
     "roads": "roads",
     "chowks": "chowks",
+    "trees": "trees",
     "terrain": "terrain",
     "roadstats": "roads_raw",
     "tiles": "tiler",

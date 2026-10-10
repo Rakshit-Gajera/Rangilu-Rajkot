@@ -5,6 +5,7 @@ import { areaMeshes, roadMeshes, type AreaMeshes, type RoadMeshes } from './road
 import { chowkMeshes, type ChowkMeshes } from './chowks';
 import { farMesh, type FarBuild } from './far';
 import { terrainMesh } from './terrain';
+import { treeInstances, type TreeInstances } from './trees';
 
 /** Everything the main thread needs to show and collide with one tile. */
 export interface TileBuild {
@@ -21,6 +22,8 @@ export interface TileBuild {
   roads: RoadMeshes;
   areas: AreaMeshes;
   chowks: ChowkMeshes;
+  /** Instance matrices per tree species. */
+  trees: TreeInstances;
   /** Road centrelines for the minimap: per road [rank, ...x, n pairs] in world metres (x, n). */
   minimapRoads: Float32Array[];
   /** strings.json index per minimap road (0xFFFFFFFF = unnamed). */
@@ -38,6 +41,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const roads = roadMeshes(tile, swx, swn);
   const areas = areaMeshes(tile, swx, swn);
   const chowks = chowkMeshes(tile);
+  const trees = treeInstances(tile);
   // Chowk kerbs, plinths and statues are solid: append them to the building collider.
   buildings.collider = concatMesh(buildings.collider, chowks.solid);
   const shown = tile.roads.filter((r) => !r.tunnel);
@@ -62,7 +66,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const triangles = geos.reduce((s, g) => s + g.index.length / 3, 0);
   return {
     key: `${tile.i},${tile.j}`, i: tile.i, j: tile.j, swx, swn, heights: tile.heights, hn: tile.hn,
-    terrain, buildings, roads, areas, chowks, minimapRoads, minimapRoadNames,
+    terrain, buildings, roads, areas, chowks, trees, minimapRoads, minimapRoadNames,
     landmarks: tile.landmarks.map((l) => ({ name: l.name, x: swx + l.x, n: swn + l.n })),
     stats: { buildings: tile.buildings.length, triangles, ms: performance.now() - t0 },
   };
@@ -75,6 +79,7 @@ export function tileTransferables(b: TileBuild): ArrayBuffer[] {
     b.chowks.lamps]) transferables(g, out);
   for (const c of [b.buildings.collider, b.roads.bridgeCollider]) out.push(c.position.buffer as ArrayBuffer, c.index.buffer as ArrayBuffer);
   for (const r of b.minimapRoads) out.push(r.buffer as ArrayBuffer);
+  for (const t of b.trees) out.push(t.buffer as ArrayBuffer);
   return out;
 }
 
