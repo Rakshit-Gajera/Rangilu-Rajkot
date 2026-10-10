@@ -10,6 +10,7 @@ import { worldUniforms } from './render/materials';
 import { Clock, Environment, goldenHour } from './render/sky';
 import { Hud } from './ui/hud';
 import { CityMap } from './ui/map';
+import { Life } from './actors/life';
 import { PauseMenu } from './ui/pause';
 import { distanceToPolyline, RoadGraph } from './world/roadgraph';
 import { World } from './world/world';
@@ -119,6 +120,9 @@ async function main() {
     travelTo = null;
     traveling = false;
   }
+  // Traffic, pedestrians and cows on the real road network (PROMPT §3.4).
+  const life = graph ? new Life(graph, world, physics, scene, quality.life, shadowSize > 0) : null;
+  if (life) life.onHorn = (x, y, z, kind) => audio.hornAt(here().distanceTo(new THREE.Vector3(x, y, z)), kind);
   const cityMap = graph ? new CityMap(graph, {
     player: () => { const p = here(); return { x: p.x, n: -p.z, heading: -follow.yaw }; },
     onWaypoint: () => { routeTimer = 0; },
@@ -240,6 +244,7 @@ async function main() {
     }
     worst.sim = Math.max(worst.sim, performance.now() - tSim);
     clock.advance(dt);
+    if (life) life.update(dt, here(), clock.hours);
 
     mark('simAll');
     // --- Visuals ----------------------------------------------------------------
@@ -313,6 +318,8 @@ async function main() {
     quality: () => quality.name,
     route: (x0: number, n0: number, x1: number, n1: number) => graph?.route(x0, n0, x1, n1)?.points ?? null,
     worldStats: () => world.stats(),
+    life: () => life?.stats() ?? null,
+    agents: () => (life?.agents ?? []).map((a) => ({ kind: a.kind, x: a.x, n: a.n, y: a.y, yaw: a.yaw, v: a.v })),
     debugScene: () => { const out: Record<string, number> = {}; scene.traverse((o) => { const mm = o as THREE.Mesh; if (mm.isMesh) { const k = (mm.material as THREE.Material).type + ((mm.material as THREE.MeshStandardMaterial).map ? ":map" : "") + (mm.visible ? "" : ":hidden") + ((mm.material as THREE.MeshStandardMaterial).map ? "@" + mm.parent?.name : ""); out[k] = (out[k] ?? 0) + 1; } }); return out; },
     roadNear: (x: number, n: number) => (graph ? graph.nodeXY(graph.nearestNode(x, n, true)) : [x, n]),
     idle: () => world.stats().queued === 0,

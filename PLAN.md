@@ -1,6 +1,8 @@
 # Plan
 
-Current phase: **P3 — Make it look like Rajkot** (PROMPT.md §13). Gate: ≥ 8/10 street screenshots recognised by Rakshit.
+Current phase: **P4 — Life** (P3 items still open below)
+
+Previous: **P3 — Make it look like Rajkot** (PROMPT.md §13). Gate: ≥ 8/10 street screenshots recognised by Rakshit.
 
 P2 gate passed (Rakshit, 2026-10-10).
 
@@ -16,7 +18,19 @@ P2 gate passed (Rakshit, 2026-10-10).
 - [x] 2.8b Independent review → fixes
 - [ ] 2.9 Rakshit: cross-city drive on his laptop (gate)
 
+## P4 tasks (started 2026-10-10 at Rakshit's request; P3 leftovers continue in parallel)
+- [x] 4.1 Traffic on the road graph: scooters, motorcycles, autos, chhakdos, cars, buses; keep-left, IDM spacing,
+      slowing at junctions, yielding to the player and cows, horns when blocked; time-of-day density incl. afternoon rest
+- [x] 4.2 Pedestrians along footpaths (kurta, shirt, saree, salwar) with pauses
+- [x] 4.3 Cows sitting and standing at the roadside (traffic steers round them)
+- [x] 4.4 Kinematic colliders for agents near the player; caps per quality preset
+- [ ] 4.5 Weather: monsoon rain, wet roads, summer haze; seasonal rivers/lakes
+- [ ] 4.6 Ambient audio: traffic hum, market chatter, temple bells, night crickets
+- [ ] 4.7 Signals at major junctions, BRTS lane on the 150 Ft Ring Road
+- [ ] 4.8 Review → gate (2-minute street clip looks alive; budgets hold)
+
 ## P3 tasks (Rakshit's priorities first: chowks, statues, flyovers)
+- [x] 3.2b Rakshit's chowk list: MIG-27 at Kotecha Chowk, Ambedkar at Hospital Chowk, old neem at Limda Chowk
 - [x] 3.1 Flyovers profiled as whole structures (no humps), widths from lanes, pillars, grey undersides
 - [x] 3.2 Chowks: 50 roundabout islands with black-and-yellow kerbs, gardens, marigolds, lamps; real names (25)
 - [x] 3.3 Statues from sourced places (Gandhi, Indira Gandhi, Vivekananda, Hanumanji); fountains, sculptures, flags

@@ -13,6 +13,33 @@ export class Audio {
     }
   }
 
+  /** Someone else's horn, quieter with distance: autos go "pom-pom", buses blare, bikes beep. */
+  hornAt(distance: number, kind: string) {
+    const ctx = this.ctx;
+    if (!ctx || distance > 120) return;
+    const vol = 0.12 * Math.max(0, 1 - distance / 120);
+    const t = ctx.currentTime;
+    const freqs = kind === 'bus' ? [196, 247] : kind === 'auto' ? [330] : kind.startsWith('car') ? [370, 466] : [494, 622];
+    const beeps = kind === 'auto' ? 2 : 1;
+    for (let k = 0; k < beeps; k++) {
+      const g = ctx.createGain();
+      const t0 = t + k * 0.22;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.01);
+      g.gain.setValueAtTime(vol, t0 + 0.16);
+      g.gain.linearRampToValueAtTime(0, t0 + 0.2);
+      g.connect(ctx.destination);
+      for (const f of freqs) {
+        const o = ctx.createOscillator();
+        o.type = 'square';
+        o.frequency.value = f;
+        o.connect(g);
+        o.start(t0);
+        o.stop(t0 + 0.21);
+      }
+    }
+  }
+
   /** Scooter horn: a bright two-tone beep. */
   horn() {
     const ctx = this.ctx;
