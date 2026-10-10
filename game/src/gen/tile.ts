@@ -4,6 +4,7 @@ import { transferables, type GeoBuf } from './geobuf';
 import { areaMeshes, roadMeshes, type AreaMeshes, type RoadMeshes } from './roads';
 import { chowkMeshes, type ChowkMeshes } from './chowks';
 import { farMesh, type FarBuild } from './far';
+import { furnitureMeshes, type FurnitureMeshes } from './furniture';
 import { terrainMesh } from './terrain';
 import { treeInstances, type TreeInstances } from './trees';
 
@@ -22,6 +23,7 @@ export interface TileBuild {
   roads: RoadMeshes;
   areas: AreaMeshes;
   chowks: ChowkMeshes;
+  furniture: FurnitureMeshes;
   /** Instance matrices per tree species. */
   trees: TreeInstances;
   /** Road centrelines for the minimap: per road [rank, ...x, n pairs] in world metres (x, n). */
@@ -42,6 +44,8 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const areas = areaMeshes(tile, swx, swn);
   const chowks = chowkMeshes(tile);
   const trees = treeInstances(tile);
+  const furniture = furnitureMeshes(tile);
+  buildings.collider = concatMesh(buildings.collider, furniture.collider);
   // Chowk kerbs, plinths and statues are solid: append them to the building collider.
   buildings.collider = concatMesh(buildings.collider, chowks.solid);
   const shown = tile.roads.filter((r) => !r.tunnel);
@@ -57,7 +61,8 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
     return out;
   });
   const geos = [terrain, buildings.walls, buildings.roofs, buildings.props, roads.surfaces, roads.markings,
-    roads.bridges, areas.grass, areas.water, areas.sand, chowks.solid, chowks.deco, chowks.lamps];
+    roads.bridges, areas.grass, areas.water, areas.sand, chowks.solid, chowks.deco, chowks.lamps,
+    furniture.solid, furniture.lamps];
   // Generators write vertex colours as sRGB; three.js shades in linear space.
   for (const g of geos) {
     const c = g.attrs.color?.[0];
@@ -66,7 +71,7 @@ export function buildTile(buf: ArrayBuffer, off: number, len: number, tileSize: 
   const triangles = geos.reduce((s, g) => s + g.index.length / 3, 0);
   return {
     key: `${tile.i},${tile.j}`, i: tile.i, j: tile.j, swx, swn, heights: tile.heights, hn: tile.hn,
-    terrain, buildings, roads, areas, chowks, trees, minimapRoads, minimapRoadNames,
+    terrain, buildings, roads, areas, chowks, furniture, trees, minimapRoads, minimapRoadNames,
     landmarks: tile.landmarks.map((l) => ({ name: l.name, x: swx + l.x, n: swn + l.n })),
     stats: { buildings: tile.buildings.length, triangles, ms: performance.now() - t0 },
   };
@@ -76,7 +81,7 @@ export function tileTransferables(b: TileBuild): ArrayBuffer[] {
   const out: ArrayBuffer[] = [b.heights.buffer as ArrayBuffer];
   for (const g of [b.terrain, b.buildings.walls, b.buildings.roofs, b.buildings.props, b.roads.surfaces,
     b.roads.markings, b.roads.bridges, b.areas.grass, b.areas.water, b.areas.sand, b.chowks.solid, b.chowks.deco,
-    b.chowks.lamps]) transferables(g, out);
+    b.chowks.lamps, b.furniture.solid, b.furniture.lamps]) transferables(g, out);
   for (const c of [b.buildings.collider, b.roads.bridgeCollider]) out.push(c.position.buffer as ArrayBuffer, c.index.buffer as ArrayBuffer);
   for (const r of b.minimapRoads) out.push(r.buffer as ArrayBuffer);
   for (const t of b.trees) out.push(t.buffer as ArrayBuffer);

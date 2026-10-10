@@ -34,6 +34,7 @@ describe.skipIf(!hasWorld)('tile generators', () => {
     ['terrain', build.terrain], ['walls', build.buildings.walls], ['roofs', build.buildings.roofs],
     ['props', build.buildings.props], ['road surfaces', build.roads.surfaces], ['markings', build.roads.markings],
     ['bridges', build.roads.bridges], ['grass', build.areas.grass], ['water', build.areas.water], ['sand', build.areas.sand],
+    ['street furniture', build.furniture.solid], ['street lamps', build.furniture.lamps],
   ];
 
   it.each(meshes)('%s has finite positions and indices in range', (_, g) => {
